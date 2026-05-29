@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <title>기후 변화 데이터 분석 및 시각화 도구</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Pretendard',sans-serif;background:#f1f5f9;padding:1rem;line-height:1.6}
+    .wrap{max-width:900px;margin:auto}
+
+    /* 헤더 */
+    .header{text-align:center;padding:1.5rem 0 1rem}
+    .header h1{font-size:24px;font-weight:700;color:#0f172a}
+    .header p{font-size:14px;color:#64748b;margin-top:4px}
+
+    /* 메인 탭 */
+    .main-tabs{display:flex;gap:4px;margin-bottom:1.25rem;background:white;padding:6px;border-radius:12px;border:1px solid #e2e8f0}
+    .main-tab{flex:1;padding:10px;font-size:14px;font-weight:600;border:none;border-radius:8px;background:transparent;color:#64748b;cursor:pointer;transition:.15s;text-align:center}
+    .main-tab.active{background:#0f172a;color:white}
+    .main-tab.disabled{opacity:.4;cursor:not-allowed}
+
+    /* 탭 패널 */
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+
+    /* 업로드 카드 */
+    .upload-card{background:white;border:2px dashed #94a3b8;border-radius:14px;padding:1.5rem;text-align:center;margin-bottom:.5rem;cursor:pointer;transition:border-color .2s}
+    .upload-card:hover{border-color:#3b82f6}
+    .upload-card .icon{font-size:36px;margin-bottom:8px}
+    .upload-card p{font-size:14px;color:#64748b}
+    /* 다운로드 안내 아코디언 */
+    .guide-toggle{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:8px;font-size:13px;color:#3b82f6;background:transparent;border:none;cursor:pointer;margin-bottom:.5rem}
+    .guide-toggle:hover{text-decoration:underline}
+    .guide-box{display:none;background:white;border:1px solid #e2e8f0;border-radius:12px;padding:1.25rem;margin-bottom:1rem;font-size:13px;color:#1e293b;line-height:1.9}
+    .guide-box.open{display:block}
+    .guide-box h4{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:.5rem;padding-bottom:.4rem;border-bottom:1px solid #e2e8f0}
+    .guide-box ol{padding-left:1.2rem;margin:.4rem 0}
+    .guide-box li{margin-bottom:.3rem}
+    .guide-box .path{display:inline-block;background:#f1f5f9;color:#0f172a;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600}
+    .guide-box .tip{margin-top:.75rem;padding:.6rem .8rem;background:#eff6ff;border-left:3px solid #3b82f6;border-radius:0 6px 6px 0;font-size:12px;color:#1d4ed8}
+    .guide-sep{border:none;border-top:1px dashed #e2e8f0;margin:.75rem 0}
+
+    /* 경고 박스 */
+    .warning-box{display:none;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:14px;padding:1.25rem 1.5rem;margin-bottom:1rem}
+    .warning-box .wtitle{font-size:15px;font-weight:700;color:#92400e;margin-bottom:8px}
+    .warning-box .wdesc{font-size:13px;color:#78350f;margin-bottom:12px;line-height:1.7}
+    .station-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+    .station-tag{background:white;border:1px solid #f59e0b;border-radius:8px;padding:5px 12px;font-size:13px;color:#92400e}
+    .steps{background:white;border-radius:8px;padding:1rem;font-size:13px;color:#64748b;line-height:2}
+    .steps b{color:#0f172a}
+
+    /* 배지 */
+    .badge-row{display:none;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:1rem}
+    .badge{background:#dbeafe;color:#1d4ed8;font-size:14px;padding:6px 16px;border-radius:8px;font-weight:500}
+
+    /* 통계 카드 */
+    .stat-grid{display:none;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1rem}
+    .stat-card{background:#f8fafc;border-radius:10px;padding:.875rem 1rem}
+    .stat-card .slabel{font-size:12px;color:#64748b;margin-bottom:4px}
+    .stat-card .sval{font-size:22px;font-weight:700;color:#0f172a}
+    .stat-card .sdesc{font-size:11px;color:#94a3b8;margin-top:2px}
+
+    /* 차트/섹션 카드 */
+    .chart-card,.section-card{background:white;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;margin-bottom:1rem;display:none}
+    .chart-tabs{display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap}
+    .tab-btn{padding:6px 14px;font-size:13px;border:1px solid #cbd5e1;border-radius:8px;background:transparent;color:#64748b;cursor:pointer;transition:.15s}
+    .tab-btn.active{background:#dbeafe;color:#1d4ed8;border-color:transparent;font-weight:600}
+
+    /* 추세선 범례 */
+    .trend-legend{display:none;justify-content:flex-end;align-items:center;gap:6px;margin-bottom:.5rem;font-size:13px;color:#64748b}
+    .trend-legend-line{width:32px;height:2px;border-top:2.5px dashed #e74c3c}
+
+    /* 편차 범례 */
+    .anomaly-legend{display:flex;gap:12px;font-size:12px;color:#64748b;margin-bottom:.5rem;flex-wrap:wrap;justify-content:flex-end}
+    .leg-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle}
+
+    /* 섹션 카드 내부 */
+    .section-card h3{font-size:16px;font-weight:700;color:#0f172a;margin-bottom:4px}
+    .section-card p{font-size:13px;color:#64748b;margin-bottom:1rem}
+    .input-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .input-row label{font-size:13px;color:#64748b}
+    .input-row input[type=number],.input-row select{padding:7px 8px;font-size:14px;border:1px solid #cbd5e1;border-radius:8px}
+    .input-row input[type=number]{width:85px;text-align:center}
+    .run-btn{padding:8px 16px;background:#3b82f6;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+    .run-btn:hover{background:#2563eb}
+    .run-btn.green{background:#10b981}
+    .run-btn.green:hover{background:#059669}
+
+    /* 결과 박스 */
+    .result-box{margin-top:1rem;padding:1rem;background:#f8fafc;border-radius:0 8px 8px 0;font-size:14px;color:#1e293b;display:none;border-left:4px solid #3b82f6}
+    .result-box.green{border-left-color:#10b981}
+    .result-box.warn{border-left-color:#f59e0b}
+    .highlight{font-size:19px;font-weight:700;color:#e74c3c}
+
+    /* 10년 단위 */
+    .decade-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-top:.75rem}
+    .decade-item{background:#f8fafc;border-radius:10px;padding:.75rem;text-align:center}
+    .decade-item .dy{font-size:12px;color:#64748b}
+    .decade-item .dt{font-size:18px;font-weight:700;color:#0f172a}
+    .decade-item.hot{background:#fef2f2}
+    .decade-item.hot .dt{color:#e74c3c}
+
+    /* 비교 탭 안내 */
+    .compare-notice{background:white;border:1px solid #e2e8f0;border-radius:14px;padding:2rem;text-align:center;color:#64748b;font-size:14px;margin-bottom:1rem}
+    .compare-notice .big{font-size:36px;margin-bottom:12px}
+    .compare-notice b{color:#0f172a}
+
+    /* 비교 요약 카드 */
+    .compare-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem}
+    .summary-card{background:#f8fafc;border-radius:10px;padding:1rem}
+    .summary-card .slabel{font-size:12px;color:#64748b;margin-bottom:4px}
+    .summary-card .sval{font-size:20px;font-weight:700;color:#e74c3c}
+    .summary-card .sdesc{font-size:12px;color:#94a3b8;margin-top:2px}
+
+    /* 기체 선택 */
+    .gas-select-row{display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap}
+    .gas-select-row label{font-size:13px;color:#64748b;font-weight:500}
+    .gas-select-row select{padding:7px 12px;font-size:13px;border:1px solid #cbd5e1;border-radius:8px;background:white}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>🌍 기후 변화 데이터 분석 및 시각화 도구</h1>
+    <p>기상청 CSV 데이터를 업로드하면 자동으로 분석합니다</p>
+  </div>
+
+  <!-- 메인 탭 -->
+  <div class="main-tabs">
+    <button class="main-tab active" onclick="switchMainTab('temp')">🌡️ 기온 변화</button>
+    <button class="main-tab" onclick="switchMainTab('gas')">🏭 온실기체</button>
+    <button class="main-tab disabled" id="compareTab" onclick="switchMainTab('compare')">🔗 비교 분석</button>
+  </div>
+
+  <!-- ===== 탭 1: 기온 변화 ===== -->
+  <div class="tab-panel active" id="panel-temp">
+    <div class="upload-card" id="tempUploadCard">
+      <div class="icon">📂</div>
+      <p>클릭하거나 CSV 파일을 여기에 드래그하세요</p>
+      <p style="font-size:12px;margin-top:4px">기상청 연평균기온 데이터 (.csv)</p>
+      <input type="file" id="tempCsvFile" accept=".csv" style="display:none">
+    </div>
+    <button class="guide-toggle" onclick="toggleGuide('tempGuide',this)">📋 데이터 다운로드 방법 보기 ▼</button>
+    <div class="guide-box" id="tempGuide">
+      <h4>🌡️ 연평균기온 데이터 다운로드</h4>
+      <ol>
+        <li><a href="https://data.kma.go.kr" target="_blank" style="color:#3b82f6">기상자료개방포털</a> 접속 및 회원가입/로그인</li>
+        <li>상단 메뉴 이동: <span class="path">데이터 → 기상관측 → 지상 → 종관기상관측</span></li>
+        <li>검색 조건 설정:<br>
+          · 자료형태: <b>년 자료</b><br>
+          · 기간: <b>전체 기간</b> (가능한 최대 범위로 설정)<br>
+          · 지점: 원하는 관측소 <b>1곳만</b> 선택 (예: 서울, 제주 등)<br>
+          · 요소: <b>평균기온</b> 체크
+        </li>
+        <li>[조회] 버튼 클릭 후 → [CSV 다운로드]</li>
+      </ol>
+      <div class="tip">⚠️ 관측소를 반드시 1곳만 선택하세요. 여러 곳 선택 시 업로드 오류가 발생합니다.</div>
+    </div>
+
+    <div class="warning-box" id="tempWarningBox">
+      <div class="wtitle">⚠️ 관측소가 여러 개 감지되었습니다</div>
+      <div class="wdesc">이 파일에는 <b id="tempStationCount"></b>개의 관측소 데이터가 섞여 있어요. 정확한 분석을 위해 관측소를 하나만 선택해서 다시 다운로드해주세요.</div>
+      <div class="station-list" id="tempStationList"></div>
+      <div class="steps">
+        <b>기상청에서 다시 다운로드하는 방법</b><br>
+        1. 기상자료개방포털 → 기후통계분석 → 기온 자료<br>
+        2. 지점 선택 시 <b>관측소를 하나만</b> 체크하세요<br>
+        3. 다운로드 후 이 페이지에 다시 업로드하세요
+      </div>
+    </div>
+
+    <div class="badge-row" id="tempBadgeRow">
+      <span class="badge">📍 관측소: <span id="tempStationBadge"></span></span>
+      <span class="badge">📅 관측 기간: <span id="tempPeriodBadge"></span></span>
+    </div>
+
+    <div class="stat-grid" id="tempStatGrid">
+      <div class="stat-card"><div class="slabel">평균 기온</div><div class="sval" id="tAvg">—</div><div class="sdesc">전체 기간 평균</div></div>
+      <div class="stat-card"><div class="slabel">최고 기온</div><div class="sval" id="tMax" style="color:#e74c3c">—</div><div class="sdesc" id="tMaxYear"></div></div>
+      <div class="stat-card"><div class="slabel">최저 기온</div><div class="sval" id="tMin" style="color:#3b82f6">—</div><div class="sdesc" id="tMinYear"></div></div>
+      <div class="stat-card"><div class="slabel">기온 범위</div><div class="sval" id="tRange">—</div><div class="sdesc">최고-최저 차이</div></div>
+      <div class="stat-card"><div class="slabel">최근 10년 평균</div><div class="sval" id="tRecent">—</div><div class="sdesc" id="tRecentPeriod"></div></div>
+    </div>
+
+    <div class="chart-card" id="tempChartCard">
+      <div class="chart-tabs">
+        <button class="tab-btn active" onclick="switchTempChart('line',this)">📈 꺾은선</button>
+        <button class="tab-btn" onclick="switchTempChart('bar',this)">📊 막대</button>
+        <button class="tab-btn" onclick="switchTempChart('scatter',this)">⚬ 산점도</button>
+        <button class="tab-btn" onclick="switchTempChart('anomaly',this)">🌡️ 편차</button>
+      </div>
+      <div class="trend-legend" id="tempTrendLegend">
+        <div class="trend-legend-line"></div><span>추세선</span>
+      </div>
+      <div class="anomaly-legend" id="tempAnomalyLegend" style="display:none">
+        <span><span class="leg-dot" style="background:#e74c3c"></span>평년보다 높음</span>
+        <span><span class="leg-dot" style="background:#3b82f6"></span>평년보다 낮음</span>
+      </div>
+      <div style="position:relative;height:300px"><canvas id="tempChart"></canvas></div>
+    </div>
+
+    <div class="section-card" id="tempDecadeCard">
+      <h3>📅 10년 단위 평균 비교</h3>
+      <p>각 연대별 평균 기온을 비교합니다. 기온 상승 경향을 한눈에 확인해보세요.</p>
+      <div class="decade-grid" id="tempDecadeGrid"></div>
+    </div>
+
+    <div class="section-card" id="tempTrendCard">
+      <h3>🔍 미션 1 — 추세 분석 구간 설정</h3>
+      <p>분석하고 싶은 구간을 입력하면 연간 기온 변화율을 계산합니다.</p>
+      <div class="input-row">
+        <input type="number" id="tStartYear" placeholder="시작">
+        <label>년부터</label>
+        <input type="number" id="tEndYear" placeholder="끝">
+        <label>년까지</label>
+        <button class="run-btn" onclick="calcTempTrend()">추세 분석 시작</button>
+      </div>
+      <div class="result-box" id="tempTrendResult"></div>
+    </div>
+
+    <div class="section-card" id="tempPredictCard">
+      <h3>💡 미션 2 — 미래 기온 예측</h3>
+      <p>위에서 분석한 변화율로 미래 기온을 예측합니다. 추세 분석을 먼저 실행하세요.</p>
+      <div class="input-row">
+        <input type="number" id="tTargetYear" placeholder="2050">
+        <label>년의 예상 기온은?</label>
+        <button class="run-btn green" onclick="predictTemp()">예측 실행</button>
+      </div>
+      <div class="result-box green" id="tempPredictResult"></div>
+    </div>
+  </div>
+
+  <!-- ===== 탭 2: 온실기체 ===== -->
+  <div class="tab-panel" id="panel-gas">
+    <div class="upload-card" id="gasUploadCard">
+      <div class="icon">📂</div>
+      <p>클릭하거나 CSV 파일을 여기에 드래그하세요</p>
+      <p style="font-size:12px;margin-top:4px">기상청 온실기체 데이터 (.csv)</p>
+      <input type="file" id="gasCsvFile" accept=".csv" style="display:none">
+    </div>
+    <button class="guide-toggle" onclick="toggleGuide('gasGuide',this)">📋 데이터 다운로드 방법 보기 ▼</button>
+    <div class="guide-box" id="gasGuide">
+      <h4>🏭 온실기체 관측 데이터 다운로드</h4>
+      <ol>
+        <li><a href="https://data.kma.go.kr" target="_blank" style="color:#3b82f6">기상자료개방포털</a> 접속</li>
+        <li>상단 메뉴 이동: <span class="path">데이터 → 기후 → 기후변화감시 → 온실가스</span></li>
+        <li>검색 조건 설정:<br>
+          · 자료형태: <b>년 자료</b><br>
+          · 기간: <b>전체 기간</b> (가능한 최대 범위로 설정)<br>
+          · 지점: <b>안면도(감)</b><br>
+          · 요소: <b>온실가스(전체선택)</b> 체크
+        </li>
+        <li>[조회] 버튼 클릭 후 → [CSV 다운로드]</li>
+      </ol>
+      <div class="tip">💡 국내 온실기체 관측소는 안면도·울릉도·고산 세 곳이며, 그중 안면도(감)는 관측 기간이 가장 길고 다양한 기체 데이터를 제공하는 관측소입니다.</div>
+    </div>
+
+    <div class="warning-box" id="gasWarningBox">
+      <div class="wtitle">⚠️ 관측소가 여러 개 감지되었습니다</div>
+      <div class="wdesc">이 파일에는 <b id="gasStationCount"></b>개의 관측소 데이터가 섞여 있어요. 관측소를 하나만 선택해서 다시 다운로드해주세요.</div>
+      <div class="station-list" id="gasStationList"></div>
+      <div class="steps">
+        <b>기상청에서 다시 다운로드하는 방법</b><br>
+        1. 기상자료개방포털 → 기후통계분석 → 온실기체<br>
+        2. 지점 선택 시 <b>관측소를 하나만</b> 체크하세요<br>
+        3. 다운로드 후 이 페이지에 다시 업로드하세요
+      </div>
+    </div>
+
+    <div class="badge-row" id="gasBadgeRow">
+      <span class="badge">📍 관측소: <span id="gasStationBadge"></span></span>
+      <span class="badge">📅 관측 기간: <span id="gasPeriodBadge"></span></span>
+    </div>
+
+    <div class="chart-card" id="gasChartCard">
+      <div class="gas-select-row">
+        <label>분석할 기체 선택:</label>
+        <select id="gasSelect" onchange="switchGas()">
+          <option value="0">CO₂ 이산화탄소 (ppm)</option>
+          <option value="1">CH₄ 메탄 (ppb)</option>
+          <option value="2">N₂O 아산화질소 (ppb)</option>
+          <option value="3">CFC-11 염화불화탄소11 (ppt)</option>
+          <option value="4">CFC-12 염화불화탄소12 (ppt)</option>
+          <option value="5">CFC-113 염화불화탄소113 (ppt)</option>
+          <option value="6">SF₆ 육불화황 (ppt)</option>
+        </select>
+      </div>
+      <div class="trend-legend" id="gasTrendLegend">
+        <div class="trend-legend-line"></div><span>추세선</span>
+      </div>
+      <div style="position:relative;height:300px"><canvas id="gasChart"></canvas></div>
+    </div>
+
+    <div class="section-card" id="gasTrendCard">
+      <h3>🔍 미션 1 — 추세 분석 구간 설정</h3>
+      <p>분석하고 싶은 구간을 입력하면 연간 농도 변화율을 계산합니다.</p>
+      <div class="input-row">
+        <input type="number" id="gStartYear" placeholder="시작">
+        <label>년부터</label>
+        <input type="number" id="gEndYear" placeholder="끝">
+        <label>년까지</label>
+        <button class="run-btn" onclick="calcGasTrend()">추세 분석 시작</button>
+      </div>
+      <div class="result-box" id="gasTrendResult"></div>
+    </div>
+
+    <div class="section-card" id="gasPredictCard">
+      <h3>💡 미션 2 — 미래 농도 예측</h3>
+      <p>위에서 분석한 변화율로 미래 농도를 예측합니다. 추세 분석을 먼저 실행하세요.</p>
+      <div class="input-row">
+        <input type="number" id="gTargetYear" placeholder="2050">
+        <label>년의 예상 농도는?</label>
+        <button class="run-btn green" onclick="predictGas()">예측 실행</button>
+      </div>
+      <div class="result-box green" id="gasPredictResult"></div>
+    </div>
+  </div>
+
+  <!-- ===== 탭 3: 비교 분석 ===== -->
+  <div class="tab-panel" id="panel-compare">
+    <div class="compare-notice" id="compareNotice">
+      <div class="big">📊</div>
+      <b>기온 변화</b>와 <b>온실기체</b> 탭에서 데이터를 모두 업로드하면<br>
+      두 데이터를 나란히 비교할 수 있어요!
+    </div>
+
+    <div class="badge-row" id="compareBadgeRow" style="display:none">
+      <span class="badge">📅 기간: <span id="comparePeriodBadge"></span></span>
+      <span class="badge" id="compareGasBadge"></span>
+    </div>
+
+    <div class="compare-summary" id="compareSummary" style="display:none">
+      <div class="summary-card">
+        <div class="slabel">🌡️ 기온 변화량</div>
+        <div class="sval" id="cTempChange">—</div>
+        <div class="sdesc" id="cTempPeriod"></div>
+      </div>
+      <div class="summary-card">
+        <div class="slabel" id="cGasLabel">🏭 CO₂ 변화량</div>
+        <div class="sval" id="cGasChange">—</div>
+        <div class="sdesc" id="cGasPeriod"></div>
+      </div>
+    </div>
+
+    <div class="chart-card" id="compareChartCard" style="display:none">
+      <div class="gas-select-row">
+        <label>비교할 기체:</label>
+        <select id="compareGasSelect" onchange="drawCompareChart()">
+          <option value="0">CO₂ 이산화탄소 (ppm)</option>
+          <option value="1">CH₄ 메탄 (ppb)</option>
+          <option value="2">N₂O 아산화질소 (ppb)</option>
+          <option value="3">CFC-11 염화불화탄소11 (ppt)</option>
+          <option value="4">CFC-12 염화불화탄소12 (ppt)</option>
+          <option value="5">CFC-113 염화불화탄소113 (ppt)</option>
+          <option value="6">SF₆ 육불화황 (ppt)</option>
+        </select>
+      </div>
+      <div style="position:relative;height:350px"><canvas id="compareChart"></canvas></div>
+      <p style="font-size:12px;color:#94a3b8;margin-top:8px;text-align:right">※ 두 데이터의 공통 기간만 표시됩니다. 왼쪽 Y축: 기온(℃), 오른쪽 Y축: 온실기체 농도</p>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:1.5rem 0 1rem;font-size:12px;color:#94a3b8">
+    © 2026 제작: 김연경(earthssaem@gmail.com) | 데이터 출처: <a href="https://data.kma.go.kr" target="_blank" style="color:#94a3b8">기상자료개방포털 (data.kma.go.kr)</a>
+  </div>
+</div><!-- /wrap -->
+
+<script>
+// ===== 전역 데이터 =====
+let tYears=[],tTemps=[],tStation='',tStationId='',tChart=null,tSlope=0,tIntercept=0,tMode='line';
+const GAS_KEYS=['co2','ch4','n2o','cfc11','cfc12','cfc113','sf6'];
+const GAS_LABELS=['CO₂ (ppm)','CH₄ (ppb)','N₂O (ppb)','CFC-11 (ppt)','CFC-12 (ppt)','CFC-113 (ppt)','SF₆ (ppt)'];
+const GAS_UNITS=['ppm','ppb','ppb','ppt','ppt','ppt','ppt'];
+const GAS_NAMES=['CO₂ 이산화탄소','CH₄ 메탄','N₂O 아산화질소','CFC-11','CFC-12','CFC-113','SF₆ 육불화황'];
+let gData={};  // {year: [co2, ch4, n2o, cfc11, cfc12, cfc113, sf6]}
+let gYears=[],gStation='',gStationId='',gChart=null,gSlope=0,gIntercept=0,gGasIdx=0;
+let compareChart=null;
+
+// ===== 메인 탭 전환 =====
+function switchMainTab(tab){
+  if(tab==='compare' && document.getElementById('compareTab').classList.contains('disabled')) return;
+  document.querySelectorAll('.main-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('[onclick="switchMainTab(\''+tab+'\')"]').classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
+  if(tab==='compare') drawCompareChart();
+}
+
+// ===== 아코디언 토글 =====
+function toggleGuide(id, btn){
+  const box=document.getElementById(id);
+  const isOpen=box.classList.contains('open');
+  box.classList.toggle('open');
+  btn.textContent=isOpen ? '📋 데이터 다운로드 방법 보기 ▼' : '📋 데이터 다운로드 방법 닫기 ▲';
+}
+
+// ===== 공통: 선형회귀 =====
+function linearRegression(xs,ys){
+  const n=xs.length;
+  let sx=0,sy=0,sxy=0,sx2=0;
+  for(let i=0;i<n;i++){sx+=xs[i];sy+=ys[i];sxy+=xs[i]*ys[i];sx2+=xs[i]*xs[i];}
+  const slope=(n*sxy-sx*sy)/(n*sx2-sx*sx);
+  const intercept=(sy-slope*sx)/n;
+  return{slope,intercept};
+}
+
+// ===== 비교 탭 활성화 체크 =====
+function checkCompareReady(){
+  const ready=tYears.length>0 && Object.keys(gData).length>0;
+  const btn=document.getElementById('compareTab');
+  if(ready){btn.classList.remove('disabled');}
+  else{btn.classList.add('disabled');}
+}
+
+// ===========================
+// ===== 탭 1: 기온 변화 =====
+// ===========================
+const tempUploadCard=document.getElementById('tempUploadCard');
+const tempCsvFile=document.getElementById('tempCsvFile');
+tempUploadCard.onclick=()=>tempCsvFile.click();
+tempCsvFile.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>processTempData(ev.target.result);r.readAsText(f,'EUC-KR');});
+tempUploadCard.addEventListener('dragover',e=>{e.preventDefault();tempUploadCard.style.borderColor='#3b82f6'});
+tempUploadCard.addEventListener('dragleave',()=>{tempUploadCard.style.borderColor='#94a3b8'});
+tempUploadCard.addEventListener('drop',e=>{e.preventDefault();tempUploadCard.style.borderColor='#94a3b8';const f=e.dataTransfer.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>processTempData(ev.target.result);r.readAsText(f,'EUC-KR');});
+
+function resetTempUI(){
+  ['tempWarningBox','tempBadgeRow','tempStatGrid','tempChartCard','tempDecadeCard','tempTrendCard','tempPredictCard'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('tempTrendLegend').style.display='none';
+  if(tChart){tChart.destroy();tChart=null;}
+}
+
+function processTempData(csv){
+  resetTempUI();
+  const lines=csv.split('\n');
+  const stations={};
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].trim();if(!line)continue;
+    const cols=line.replace(/"/g,'').split(',');
+    if(cols.length>=4){
+      const sid=cols[0].trim(),sn=cols[1].trim(),yr=cols[2].trim(),tp=cols[3].trim();
+      if(!isNaN(yr)&&yr.length===4&&tp!==''&&!isNaN(tp)){
+        if(!stations[sid])stations[sid]={name:sn,years:[],temps:[]};
+        stations[sid].years.push(parseInt(yr));
+        stations[sid].temps.push(parseFloat(tp));
+      }
+    }
+  }
+  const keys=Object.keys(stations);
+  if(keys.length===0)return;
+  if(keys.length>1){
+    document.getElementById('tempWarningBox').style.display='block';
+    document.getElementById('tempStationCount').textContent=keys.length;
+    const sl=document.getElementById('tempStationList');sl.innerHTML='';
+    keys.forEach(k=>{const s=stations[k];const tag=document.createElement('span');tag.className='station-tag';tag.textContent=s.name+' (지점코드 '+k+', '+s.years.length+'년)';sl.appendChild(tag);});
+    return;
+  }
+  const sid=keys[0];
+  tStationId=sid;tStation=stations[sid].name;
+  tYears=stations[sid].years;tTemps=stations[sid].temps;
+  renderTempAll();
+  checkCompareReady();
+}
+
+function renderTempAll(){
+  const s=tYears[0],e=tYears[tYears.length-1];
+  document.getElementById('tempBadgeRow').style.display='flex';
+  document.getElementById('tempStationBadge').textContent=tStation+' ('+tStationId+')';
+  document.getElementById('tempPeriodBadge').textContent=s+'년 ~ '+e+'년';
+  const avg=tTemps.reduce((a,b)=>a+b,0)/tTemps.length;
+  const maxT=Math.max(...tTemps),minT=Math.min(...tTemps);
+  const maxY=tYears[tTemps.indexOf(maxT)],minY=tYears[tTemps.indexOf(minT)];
+  const recentStart=e-9;
+  const recentTemps=tTemps.filter((_,i)=>tYears[i]>=recentStart);
+  const recentAvg=recentTemps.reduce((a,b)=>a+b,0)/recentTemps.length;
+  document.getElementById('tempStatGrid').style.display='grid';
+  document.getElementById('tAvg').textContent=avg.toFixed(1)+'℃';
+  document.getElementById('tMax').textContent=maxT.toFixed(1)+'℃';
+  document.getElementById('tMaxYear').textContent=maxY+'년 기록';
+  document.getElementById('tMin').textContent=minT.toFixed(1)+'℃';
+  document.getElementById('tMinYear').textContent=minY+'년 기록';
+  document.getElementById('tRange').textContent=(maxT-minT).toFixed(1)+'℃';
+  document.getElementById('tRecent').textContent=recentAvg.toFixed(1)+'℃';
+  document.getElementById('tRecentPeriod').textContent=recentStart+'~'+e+'년 평균';
+  document.getElementById('tempChartCard').style.display='block';
+  drawTempChart('line');
+  renderTempDecades();
+  ['tempDecadeCard','tempTrendCard','tempPredictCard'].forEach(id=>document.getElementById(id).style.display='block');
+  document.getElementById('tStartYear').value=s;
+  document.getElementById('tEndYear').value=e;
+}
+
+function renderTempDecades(){
+  const decades={};
+  tYears.forEach((y,i)=>{const d=Math.floor(y/10)*10;if(!decades[d])decades[d]=[];decades[d].push(tTemps[i]);});
+  const avgs=Object.values(decades).map(a=>a.reduce((x,b)=>x+b,0)/a.length);
+  const maxA=Math.max(...avgs);
+  const grid=document.getElementById('tempDecadeGrid');grid.innerHTML='';
+  Object.keys(decades).sort().forEach((d,idx)=>{
+    const a=avgs[idx];const isHot=Math.abs(a-maxA)<0.05;
+    const el=document.createElement('div');el.className='decade-item'+(isHot?' hot':'');
+    el.innerHTML='<div class="dy">'+d+'년대</div><div class="dt">'+a.toFixed(1)+'℃</div>';
+    grid.appendChild(el);
+  });
+}
+
+function drawTempChart(mode,trendArr){
+  const ctx=document.getElementById('tempChart').getContext('2d');
+  if(tChart)tChart.destroy();
+  const avg=tTemps.reduce((a,b)=>a+b,0)/tTemps.length;
+  const hasTrend=trendArr&&trendArr.some(v=>v!==null);
+  document.getElementById('tempTrendLegend').style.display=hasTrend?'flex':'none';
+  let datasets=[];
+  if(mode==='anomaly'){
+    document.getElementById('tempAnomalyLegend').style.display='flex';
+    const ad=tTemps.map(t=>parseFloat((t-avg).toFixed(2)));
+    datasets=[{label:'기온 편차',data:ad,backgroundColor:ad.map(v=>v>=0?'rgba(231,76,60,0.7)':'rgba(59,130,246,0.7)'),borderColor:ad.map(v=>v>=0?'#e74c3c':'#3b82f6'),borderWidth:1,type:'bar'}];
+  } else {
+    document.getElementById('tempAnomalyLegend').style.display='none';
+    const bd={label:tStation+' 연평균 기온',data:mode==='scatter'?tYears.map((y,i)=>({x:y,y:tTemps[i]})):tTemps,borderColor:'#3b82f6',backgroundColor:mode==='line'?'rgba(59,130,246,0.07)':'rgba(59,130,246,0.6)',borderWidth:mode==='scatter'?0:2,pointRadius:mode==='scatter'?4:2,tension:0.2,fill:mode==='line',type:mode==='bar'?'bar':mode==='scatter'?'scatter':'line',order:2};
+    datasets=[bd];
+    if(hasTrend)datasets.push({label:'추세선',data:trendArr,borderColor:'#e74c3c',borderWidth:2.5,borderDash:[6,4],pointRadius:0,fill:false,type:'line',order:1});
+  }
+  tChart=new Chart(ctx,{
+    type:mode==='bar'?'bar':mode==='scatter'?'scatter':'line',
+    data:{labels:mode==='scatter'?undefined:tYears,datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},title:{display:true,text:tStation+' 연평균 기온',color:'#0f172a',font:{size:14,weight:'600'},padding:{bottom:8}},
+        tooltip:{callbacks:{label:c=>mode==='anomaly'?(c.parsed.y>0?'평년보다 +':'평년보다 ')+c.parsed.y.toFixed(2)+'℃':c.parsed.y.toFixed(1)+'℃'}}},
+      scales:{x:{ticks:{color:'#64748b',maxTicksLimit:10},grid:{color:'rgba(0,0,0,0.06)'},title:{display:true,text:'연도',color:'#64748b'}},
+        y:{ticks:{color:'#64748b',callback:v=>v.toFixed(1)+'℃'},grid:{color:'rgba(0,0,0,0.06)'},title:{display:true,text:mode==='anomaly'?'편차(℃)':'기온(℃)',color:'#64748b'}}}}
+  });
+  tMode=mode;
+}
+
+function switchTempChart(mode,btn){
+  document.querySelectorAll('#tempChartCard .tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');tSlope=0;tIntercept=0;
+  document.getElementById('tempTrendResult').style.display='none';
+  document.getElementById('tempPredictResult').style.display='none';
+  document.getElementById('tempTrendLegend').style.display='none';
+  drawTempChart(mode);
+}
+
+function calcTempTrend(){
+  const sy=parseInt(document.getElementById('tStartYear').value);
+  const ey=parseInt(document.getElementById('tEndYear').value);
+  const fy=[],ft=[];
+  tYears.forEach((y,i)=>{if(y>=sy&&y<=ey){fy.push(y);ft.push(tTemps[i]);}});
+  if(fy.length<2)return;
+  const r=linearRegression(fy,ft);tSlope=r.slope;tIntercept=r.intercept;
+  const tArr=tYears.map(y=>(y>=sy&&y<=ey)?parseFloat((tSlope*y+tIntercept).toFixed(2)):null);
+  if(tMode!=='anomaly'&&tMode!=='scatter')drawTempChart(tMode,tArr);
+  const dir=tSlope>0?'상승':'하강';
+  const rb=document.getElementById('tempTrendResult');rb.style.display='block';rb.className='result-box';
+  rb.innerHTML='<b>'+sy+'년 ~ '+ey+'년</b> 분석 결과<br>이 구간 기온은 매년 평균 <span class="highlight">'+Math.abs(tSlope).toFixed(4)+'℃/년</span> 씩 <b>'+dir+'</b> 중입니다.<br><span style="font-size:12px;color:#94a3b8">10년 누적 변화: '+Math.abs(tSlope*10).toFixed(2)+'℃</span>';
+  document.getElementById('tempPredictResult').style.display='none';
+}
+
+function predictTemp(){
+  const ty=parseInt(document.getElementById('tTargetYear').value);
+  const rb=document.getElementById('tempPredictResult');rb.style.display='block';
+  if(!tSlope){rb.className='result-box warn';rb.innerHTML='⚠️ 미션 1의 추세 분석을 먼저 실행해주세요!';return;}
+  if(!ty){rb.className='result-box warn';rb.innerHTML='⚠️ 예측할 연도를 입력해주세요!';return;}
+  rb.className='result-box green';
+  const pt=(tSlope*ty+tIntercept).toFixed(2);
+  rb.innerHTML='<b>'+ty+'년</b> 예상 평균 기온: <span class="highlight">'+pt+'℃</span><br><span style="font-size:12px;color:#94a3b8">선형 외삽 예측값 (위 분석 구간 변화율 적용)</span>';
+}
+
+// ===========================
+// ===== 탭 2: 온실기체 =====
+// ===========================
+const gasUploadCard=document.getElementById('gasUploadCard');
+const gasCsvFile=document.getElementById('gasCsvFile');
+gasUploadCard.onclick=()=>gasCsvFile.click();
+gasCsvFile.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>processGasData(ev.target.result);r.readAsText(f,'EUC-KR');});
+gasUploadCard.addEventListener('dragover',e=>{e.preventDefault();gasUploadCard.style.borderColor='#3b82f6'});
+gasUploadCard.addEventListener('dragleave',()=>{gasUploadCard.style.borderColor='#94a3b8'});
+gasUploadCard.addEventListener('drop',e=>{e.preventDefault();gasUploadCard.style.borderColor='#94a3b8';const f=e.dataTransfer.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>processGasData(ev.target.result);r.readAsText(f,'EUC-KR');});
+
+function resetGasUI(){
+  ['gasWarningBox','gasBadgeRow','gasChartCard','gasTrendCard','gasPredictCard'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('gasTrendLegend').style.display='none';
+  if(gChart){gChart.destroy();gChart=null;}
+}
+
+function processGasData(csv){
+  resetGasUI();
+  const lines=csv.split('\n');
+  const stations={};
+  for(let i=1;i<lines.length;i++){  // 1부터 시작 (헤더 스킵)
+    const line=lines[i].trim();if(!line)continue;
+    const cols=line.replace(/"/g,'').split(',');
+    if(cols.length>=4){
+      const sid=cols[0].trim(),sn=cols[1].trim(),yr=cols[2].trim();
+      if(!isNaN(yr)&&yr.length===4){
+        if(!stations[sid])stations[sid]={name:sn,data:{}};
+        const vals=[];
+        for(let c=3;c<=9;c++){
+          const v=cols[c]?parseFloat(cols[c].trim()):NaN;
+          vals.push((isNaN(v)||v===-999)?null:v);
+        }
+        stations[sid].data[parseInt(yr)]=vals;
+      }
+    }
+  }
+  const keys=Object.keys(stations);
+  if(keys.length===0)return;
+  if(keys.length>1){
+    document.getElementById('gasWarningBox').style.display='block';
+    document.getElementById('gasStationCount').textContent=keys.length;
+    const sl=document.getElementById('gasStationList');sl.innerHTML='';
+    keys.forEach(k=>{const s=stations[k];const tag=document.createElement('span');tag.className='station-tag';tag.textContent=s.name+' (지점코드 '+k+')';sl.appendChild(tag);});
+    return;
+  }
+  const sid=keys[0];
+  gStationId=sid;gStation=stations[sid].name;
+  gData=stations[sid].data;
+  gYears=Object.keys(gData).map(Number).sort((a,b)=>a-b);
+  renderGasAll();
+  checkCompareReady();
+}
+
+function renderGasAll(){
+  const s=gYears[0],e=gYears[gYears.length-1];
+  document.getElementById('gasBadgeRow').style.display='flex';
+  document.getElementById('gasStationBadge').textContent=gStation+' ('+gStationId+')';
+  document.getElementById('gasPeriodBadge').textContent=s+'년 ~ '+e+'년';
+  document.getElementById('gasChartCard').style.display='block';
+  gGasIdx=0;
+  drawGasChart();
+  ['gasTrendCard','gasPredictCard'].forEach(id=>document.getElementById(id).style.display='block');
+  document.getElementById('gStartYear').value=s;
+  document.getElementById('gEndYear').value=e;
+}
+
+function getGasSeriesData(idx){
+  const ys=[],vs=[];
+  gYears.forEach(y=>{
+    const v=gData[y]?gData[y][idx]:null;
+    if(v!==null&&v!==undefined){ys.push(y);vs.push(v);}
+  });
+  return{years:ys,vals:vs};
+}
+
+function drawGasChart(trendArr){
+  const ctx=document.getElementById('gasChart').getContext('2d');
+  if(gChart)gChart.destroy();
+  const idx=parseInt(document.getElementById('gasSelect').value);
+  gGasIdx=idx;
+  const {years,vals}=getGasSeriesData(idx);
+  const hasTrend=trendArr&&trendArr.some(v=>v!==null);
+  document.getElementById('gasTrendLegend').style.display=hasTrend?'flex':'none';
+  const datasets=[{
+    label:GAS_LABELS[idx],data:vals,
+    borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.07)',
+    borderWidth:2,pointRadius:2,tension:0.2,fill:true,order:2
+  }];
+  if(hasTrend)datasets.push({label:'추세선',data:trendArr,borderColor:'#e74c3c',borderWidth:2.5,borderDash:[6,4],pointRadius:0,fill:false,type:'line',order:1});
+  gChart=new Chart(ctx,{
+    type:'line',
+    data:{labels:years,datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},title:{display:true,text:gStation+' '+GAS_NAMES[idx]+' 농도',color:'#0f172a',font:{size:14,weight:'600'},padding:{bottom:8}},
+        tooltip:{callbacks:{label:c=>c.parsed.y.toFixed(2)+' '+GAS_UNITS[idx]}}},
+      scales:{x:{ticks:{color:'#64748b',maxTicksLimit:10},grid:{color:'rgba(0,0,0,0.06)'},title:{display:true,text:'연도',color:'#64748b'}},
+        y:{ticks:{color:'#64748b'},grid:{color:'rgba(0,0,0,0.06)'},title:{display:true,text:GAS_LABELS[idx],color:'#64748b'}}}}
+  });
+}
+
+function switchGas(){
+  gSlope=0;gIntercept=0;
+  document.getElementById('gasTrendResult').style.display='none';
+  document.getElementById('gasPredictResult').style.display='none';
+  document.getElementById('gasTrendLegend').style.display='none';
+  drawGasChart();
+  // 비교 탭도 업데이트
+  if(compareChart)drawCompareChart();
+}
+
+function calcGasTrend(){
+  const sy=parseInt(document.getElementById('gStartYear').value);
+  const ey=parseInt(document.getElementById('gEndYear').value);
+  const idx=parseInt(document.getElementById('gasSelect').value);
+  const {years,vals}=getGasSeriesData(idx);
+  const fy=[],fv=[];
+  years.forEach((y,i)=>{if(y>=sy&&y<=ey){fy.push(y);fv.push(vals[i]);}});
+  if(fy.length<2)return;
+  const r=linearRegression(fy,fv);gSlope=r.slope;gIntercept=r.intercept;
+  const tArr=years.map(y=>(y>=sy&&y<=ey)?parseFloat((gSlope*y+gIntercept).toFixed(3)):null);
+  drawGasChart(tArr);
+  const dir=gSlope>0?'증가':'감소';
+  const rb=document.getElementById('gasTrendResult');rb.style.display='block';rb.className='result-box';
+  rb.innerHTML='<b>'+sy+'년 ~ '+ey+'년</b> 분석 결과<br>'+GAS_NAMES[idx]+' 농도는 매년 평균 <span class="highlight">'+Math.abs(gSlope).toFixed(4)+' '+GAS_UNITS[idx]+'/년</span> 씩 <b>'+dir+'</b> 중입니다.<br><span style="font-size:12px;color:#94a3b8">10년 누적 변화: '+Math.abs(gSlope*10).toFixed(2)+' '+GAS_UNITS[idx]+'</span>';
+  document.getElementById('gasPredictResult').style.display='none';
+}
+
+function predictGas(){
+  const ty=parseInt(document.getElementById('gTargetYear').value);
+  const idx=parseInt(document.getElementById('gasSelect').value);
+  const rb=document.getElementById('gasPredictResult');rb.style.display='block';
+  if(!gSlope){rb.className='result-box warn';rb.innerHTML='⚠️ 미션 1의 추세 분석을 먼저 실행해주세요!';return;}
+  if(!ty){rb.className='result-box warn';rb.innerHTML='⚠️ 예측할 연도를 입력해주세요!';return;}
+  rb.className='result-box green';
+  const pt=(gSlope*ty+gIntercept).toFixed(2);
+  rb.innerHTML='<b>'+ty+'년</b> 예상 '+GAS_NAMES[idx]+' 농도: <span class="highlight">'+pt+' '+GAS_UNITS[idx]+'</span><br><span style="font-size:12px;color:#94a3b8">선형 외삽 예측값 (위 분석 구간 변화율 적용)</span>';
+}
+
+// ===========================
+// ===== 탭 3: 비교 분석 =====
+// ===========================
+function drawCompareChart(){
+  if(tYears.length===0||Object.keys(gData).length===0) return;
+  const idx=parseInt(document.getElementById('compareGasSelect').value);
+  const {years:gys,vals:gvs}=getGasSeriesData(idx);
+
+  // 공통 연도 구간
+  const commonYears=tYears.filter(y=>gys.includes(y));
+  if(commonYears.length===0) return;
+
+  const commonTemps=commonYears.map(y=>tTemps[tYears.indexOf(y)]);
+  const commonGas=commonYears.map(y=>gvs[gys.indexOf(y)]);
+
+  // 요약 카드
+  const tChange=commonTemps[commonTemps.length-1]-commonTemps[0];
+  const gChange=commonGas[commonGas.length-1]-commonGas[0];
+  const py=commonYears[0],ey=commonYears[commonYears.length-1];
+
+  document.getElementById('compareNotice').style.display='none';
+  document.getElementById('compareBadgeRow').style.display='flex';
+  document.getElementById('comparePeriodBadge').textContent=py+'년 ~ '+ey+'년';
+  document.getElementById('compareGasBadge').textContent='🏭 온실기체: '+GAS_NAMES[idx];
+  document.getElementById('compareSummary').style.display='grid';
+  document.getElementById('cTempChange').textContent=(tChange>0?'+':'')+tChange.toFixed(2)+'℃';
+  document.getElementById('cTempPeriod').textContent=py+'→'+ey+'년 변화량';
+  document.getElementById('cGasLabel').textContent='🏭 '+GAS_NAMES[idx]+' 변화량';
+  document.getElementById('cGasChange').textContent=(gChange>0?'+':'')+gChange.toFixed(2)+' '+GAS_UNITS[idx];
+  document.getElementById('cGasPeriod').textContent=py+'→'+ey+'년 변화량';
+  document.getElementById('compareChartCard').style.display='block';
+
+  const ctx=document.getElementById('compareChart').getContext('2d');
+  if(compareChart)compareChart.destroy();
+  compareChart=new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:commonYears,
+      datasets:[
+        {label:'기온 (℃)',data:commonTemps,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.07)',borderWidth:2,pointRadius:2,tension:0.2,fill:true,yAxisID:'y1',order:2},
+        {label:GAS_LABELS[idx],data:commonGas,borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.07)',borderWidth:2,pointRadius:2,tension:0.2,fill:true,yAxisID:'y2',order:1}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:true,labels:{color:'#64748b',font:{size:12},usePointStyle:true,pointStyle:'line',generateLabels(chart){return chart.data.datasets.map((ds,i)=>({text:ds.label,strokeStyle:ds.borderColor,fillStyle:'transparent',lineWidth:2.5,pointStyle:'line',hidden:false,datasetIndex:i}));}}},
+        title:{display:true,text:'기온 변화 vs '+GAS_NAMES[idx]+' 농도 변화',color:'#0f172a',font:{size:14,weight:'600'},padding:{bottom:8}},
+        tooltip:{mode:'index',intersect:false}
+      },
+      scales:{
+        x:{ticks:{color:'#64748b',maxTicksLimit:10},grid:{color:'rgba(0,0,0,0.06)'},title:{display:true,text:'연도',color:'#64748b'}},
+        y1:{type:'linear',position:'left',ticks:{color:'#3b82f6',callback:v=>v.toFixed(1)+'℃'},grid:{color:'rgba(0,0,0,0.06)'},title:{display:true,text:'기온 (℃)',color:'#3b82f6'}},
+        y2:{type:'linear',position:'right',ticks:{color:'#10b981',callback:v=>v.toFixed(1)},grid:{drawOnChartArea:false},title:{display:true,text:GAS_LABELS[idx],color:'#10b981'}}
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>

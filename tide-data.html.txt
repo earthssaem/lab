@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>조석 데이터 분석 및 시각화 도구</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Pretendard','Noto Sans KR',sans-serif;
+  background:#f1f5f9;
+  padding:1rem;
+  line-height:1.6;
+  color:#0f172a;
+}
+.wrap{max-width:900px;margin:auto}
+
+.header{text-align:center;padding:1.5rem 0 1rem}
+.header h1{font-size:24px;font-weight:700;color:#0f172a}
+.header p{font-size:14px;color:#64748b;margin-top:4px}
+
+/* 업로드 카드 */
+.upload-card{background:white;border:2px dashed #94a3b8;border-radius:14px;padding:1.5rem;text-align:center;margin-bottom:1rem;cursor:pointer;transition:border-color .2s}
+.upload-card:hover{border-color:#1e3a8a}
+.upload-card.dragging{border-color:#1e3a8a;background:#eff6ff}
+.upload-card .icon{font-size:36px;margin-bottom:8px}
+.upload-card p{font-size:14px;color:#64748b}
+.upload-card p.subtitle{font-size:12px;margin-top:4px;color:#94a3b8}
+
+/* 상태 메시지 */
+.status-msg{font-size:13px;margin-top:10px;color:#64748b;padding:8px 0}
+.status-msg.loading{color:#1e3a8a}
+.status-msg.loading::before{content:"⏳ "}
+.status-msg.success{color:#059669}
+.status-msg.success::before{content:"✓ "}
+.status-msg.error{color:#dc2626;background:#fef2f2;border:1px solid #fecaca;padding:10px 14px;border-radius:8px;text-align:left}
+.status-msg.error::before{content:"⚠️ "}
+
+/* 정보 배지 (알약 형태) */
+.info-pills{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:1.25rem}
+.info-pill{display:inline-flex;align-items:center;gap:6px;background:white;border:1px solid #e2e8f0;border-radius:999px;padding:7px 16px;font-size:13px;color:#475569;font-weight:500}
+.info-pill b{color:#0f172a;font-weight:600}
+
+/* 차트 카드 */
+.chart-card{background:white;border-radius:14px;padding:1.25rem;margin-bottom:1rem;border:1px solid #e2e8f0}
+.chart-card .ctitle{font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px}
+.chart-card .csub{font-size:12px;color:#64748b;margin-bottom:12px}
+.chart-wrap{position:relative;height:380px}
+
+/* 섹션 제목 */
+.section-title{display:flex;align-items:baseline;gap:10px;margin:1.5rem 0 0.75rem;padding-bottom:8px;border-bottom:1px solid #e2e8f0}
+.section-title h2{font-size:18px;font-weight:700;color:#0f172a}
+.section-title .stnote{font-size:12px;color:#94a3b8;margin-left:auto;font-family:'JetBrains Mono',monospace}
+
+/* 날짜 선택 상세보기 */
+.day-detail-controls{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.day-detail-controls label{font-size:13px;color:#64748b;font-weight:500}
+.day-select{font-family:inherit;font-size:14px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:white;color:#0f172a;cursor:pointer;min-width:120px}
+.day-nav-btn{font-size:16px;width:36px;height:36px;border:1px solid #cbd5e1;border-radius:8px;background:white;color:#475569;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center}
+.day-nav-btn:hover{background:#0f172a;color:white;border-color:#0f172a}
+
+/* 만조/간조 요약 카드 */
+/* 만조/간조 요약 줄 */
+.day-summary-line{font-size:14px;color:#475569;margin-bottom:12px;padding:10px 14px;background:#f8fafc;border-radius:8px}
+.day-summary-line b{color:#0f172a}
+
+.day-chart-wrap{position:relative;height:240px}
+
+/* 푸터 */
+.footer{text-align:center;color:#94a3b8;font-size:12px;padding:2rem 0 1rem;margin-top:2rem;border-top:1px solid #e2e8f0;line-height:1.8}
+.footer a{color:#94a3b8}
+
+/* 안내 박스 */
+.guide-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;font-size:13px;line-height:1.7;color:#475569}
+.guide-card b{color:#0f172a}
+.guide-card a{color:#1e3a8a}
+.guide-card .guide-sub{display:block;margin:6px 0 0 14px;padding:10px 14px;background:white;border-radius:8px;border:1px solid #e2e8f0;line-height:1.9}
+.guide-card .icon-text{font-family:'JetBrains Mono',monospace;font-size:12px;color:#64748b;display:block;margin-top:10px}
+
+@media (max-width: 640px){
+  body{padding:0.5rem}
+  .header h1{font-size:20px}
+  .chart-wrap{height:300px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="header">
+  <h1>🌊 조석 데이터 분석 및 시각화 도구</h1>
+  <p>국립해양조사원 바다누리 해양정보 서비스에서 다운받은 조석 데이터를 업로드하면 한 달간의 조위 변화를 시각화합니다</p>
+</div>
+
+<!-- 업로드 -->
+<div class="upload-card" id="uploadCard">
+  <div class="icon">📂</div>
+  <p>클릭하거나 .txt 파일을 여기에 드래그하세요</p>
+  <p class="subtitle">KHOA 월별 조위 데이터 (.txt)</p>
+  <input type="file" id="fileInput" accept=".txt,.csv" style="display:none">
+</div>
+
+<div id="status"></div>
+
+<div class="guide-card" id="guideCard">
+  <b>📥 데이터 다운로드 방법</b><br>
+  1. <a href="https://www.khoa.go.kr/oceandata/main.do" target="_blank"><b>바다누리 해양정보 서비스</b></a>에 접속하여 회원가입 및 로그인을 진행합니다.<br>
+  2. 상단 메뉴에서 <b>[내려받기]</b>로 이동합니다.<br>
+  3. 아래 메뉴에서 다음과 같이 순서대로 선택합니다.<br>
+  <span class="guide-sub">
+    • 자료구분: <b>조석 성과</b> 선택<br>
+    • 자료 종류: <b>1시간 조위</b> 선택<br>
+    • 자료 유형: <b>월별</b> 선택<br>
+    • 관측소 유형: <b>조위관측소</b> 선택<br>
+    • 관측소 선택: 분석할 <b>관측소명</b> 선택<br>
+    • 연도: 태풍이 발생했던 <b>연도</b> 선택<br>
+    • 🚨 설정 완료 후 <b>[검색]</b> 버튼 클릭!
+  </span>
+</div>
+
+<div id="results"></div>
+
+<div class="footer">
+  © 2026 제작: 김연경(earthssaem@gmail.com) | 데이터 출처: 국립해양조사원 바다누리 해양정보 서비스 (khoa.go.kr)
+</div>
+
+</div>
+
+<script>
+// ============== Apps Script 환경 체크 ==============
+var IS_APPS_SCRIPT = (typeof google !== 'undefined' && google.script && google.script.run);
+
+// ============== 음력(근사) 계산 ==============
+// 기준 삭(신월): 2000/01/06 18:14 UTC, 삭망월 29.530588853일
+var KNOWN_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14, 0);
+var SYNODIC_MS = 29.530588853 * 24 * 3600 * 1000;
+function lunarDay(date) {
+  var diff = date.getTime() - KNOWN_NEW_MOON;
+  var cycles = diff / SYNODIC_MS;
+  var phase = cycles - Math.floor(cycles);
+  if (phase < 0) phase += 1;
+  var age = phase * 29.530588853;
+  var d = Math.floor(age) + 1;
+  if (d > 30) d = 30;
+  return d;
+}
+
+// 달 위상 아이콘 + 이름 (근사)
+function moonPhase(date) {
+  var diff = date.getTime() - KNOWN_NEW_MOON;
+  var cycles = diff / SYNODIC_MS;
+  var phase = cycles - Math.floor(cycles);
+  if (phase < 0) phase += 1;
+  var icon, name;
+  if (phase < 0.0625 || phase >= 0.9375) { icon = '🌑'; name = '삭(그믐)'; }
+  else if (phase < 0.1875) { icon = '🌒'; name = '초승달'; }
+  else if (phase < 0.3125) { icon = '🌓'; name = '상현달'; }
+  else if (phase < 0.4375) { icon = '🌔'; name = '상현~보름'; }
+  else if (phase < 0.5625) { icon = '🌕'; name = '망(보름)'; }
+  else if (phase < 0.6875) { icon = '🌖'; name = '보름~하현'; }
+  else if (phase < 0.8125) { icon = '🌗'; name = '하현달'; }
+  else { icon = '🌘'; name = '그믐달'; }
+  return { icon: icon, name: name };
+}
+
+// ============== 유틸 ==============
+function fmt(n, digits) {
+  if (n === null || n === undefined || isNaN(n)) return '–';
+  return Number(n).toFixed(digits === undefined ? 1 : digits);
+}
+function fmtDate(d, opts) {
+  opts = opts || {};
+  if (!(d instanceof Date)) d = new Date(d);
+  var M = String(d.getMonth()+1).padStart(2,'0');
+  var D = String(d.getDate()).padStart(2,'0');
+  var h = String(d.getHours()).padStart(2,'0');
+  var m = String(d.getMinutes()).padStart(2,'0');
+  if (opts.dateOnly) return M+'/'+D;
+  if (opts.ymd) return d.getFullYear()+'-'+M+'-'+D;
+  if (opts.short) return M+'/'+D+' '+h+':'+m;
+  if (opts.timeOnly) return h+':'+m;
+  return d.getFullYear()+'-'+M+'-'+D+' '+h+':'+m;
+}
+function $(sel) { return document.querySelector(sel); }
+function setStatus(msg, type) {
+  var s = $('#status');
+  if (!msg) { s.innerHTML = ''; return; }
+  s.innerHTML = '<div class="status-msg ' + (type||'') + '">' + msg + '</div>';
+}
+
+// ============== 파일 업로드 ==============
+var currentData = null;
+var uploadCard = $('#uploadCard');
+var fileInput = $('#fileInput');
+
+uploadCard.addEventListener('click', function() { fileInput.click(); });
+fileInput.addEventListener('change', function(e) { handleFile(e.target.files[0]); });
+uploadCard.addEventListener('dragover', function(e) { e.preventDefault(); uploadCard.classList.add('dragging'); });
+uploadCard.addEventListener('dragleave', function() { uploadCard.classList.remove('dragging'); });
+uploadCard.addEventListener('drop', function(e) {
+  e.preventDefault();
+  uploadCard.classList.remove('dragging');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+  if (!file) return;
+  setStatus('파일 읽는 중…', 'loading');
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var content = e.target.result;
+    if (IS_APPS_SCRIPT) {
+      setStatus('분석 중…', 'loading');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (!result.ok) { setStatus(result.error, 'error'); return; }
+          onProcessed(result);
+        })
+        .withFailureHandler(function(err) { setStatus('서버 오류: ' + err.message, 'error'); })
+        .processData(content, file.name);
+    } else {
+      setStatus('분석 중…', 'loading');
+      setTimeout(function() {
+        try {
+          var result = processDataClient(content, file.name);
+          if (!result.ok) { setStatus(result.error, 'error'); return; }
+          onProcessed(result);
+        } catch (err) { setStatus('처리 오류: ' + err.message, 'error'); }
+      }, 30);
+    }
+  };
+  reader.onerror = function() { setStatus('파일을 읽을 수 없습니다.', 'error'); };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function onProcessed(result) {
+  setStatus('분석이 완료되었어요!', 'success');
+  currentData = result;
+  $('#guideCard').style.display = 'none';
+  render(result);
+  // 3초 후 완료 메시지 자동 제거
+  setTimeout(function() { setStatus(''); }, 3000);
+}
+
+// ============== 클라이언트 측 파싱 (미리보기/테스트용) ==============
+function processDataClient(content, fileName) {
+  try {
+    var parsed = parseTideFile(content);
+    if (!parsed.rows || parsed.rows.length === 0) {
+      return { ok: false, error: '데이터를 읽을 수 없습니다. KHOA 조석성과 1시간 조위 .txt 파일이 맞는지 확인해주세요.' };
+    }
+    var extrema = findAllExtrema(parsed.rows);
+    var days = aggregateDaily(parsed.rows, extrema);
+    var stats = computeStats(parsed.rows);
+    return { ok: true, meta: parsed.meta, fileName: fileName, rows: parsed.rows, stats: stats, days: days };
+  } catch (err) {
+    return { ok: false, error: '처리 중 오류: ' + err.message };
+  }
+}
+
+// 전체 시계열에서 만조(high)/간조(low) 극값 검출 (경계 제외)
+function findAllExtrema(rows) {
+  var ext = [];
+  var win = 2; // ±2시간 윈도우
+  for (var i = win; i < rows.length - win; i++) {
+    var isMax = true, isMin = true;
+    for (var j = i - win; j <= i + win; j++) {
+      if (j === i) continue;
+      if (rows[j].v > rows[i].v) isMax = false;
+      if (rows[j].v < rows[i].v) isMin = false;
+    }
+    if (isMax && !isMin) ext.push({ t: rows[i].t, v: rows[i].v, type: 'high' });
+    else if (isMin && !isMax) ext.push({ t: rows[i].t, v: rows[i].v, type: 'low' });
+  }
+  // 같은 타입 연속(평평한 정점) 정리
+  var cleaned = [];
+  for (var i = 0; i < ext.length; i++) {
+    if (cleaned.length && cleaned[cleaned.length-1].type === ext[i].type) {
+      var last = cleaned[cleaned.length-1];
+      if (ext[i].type === 'high' && ext[i].v > last.v) cleaned[cleaned.length-1] = ext[i];
+      if (ext[i].type === 'low' && ext[i].v < last.v) cleaned[cleaned.length-1] = ext[i];
+    } else cleaned.push(ext[i]);
+  }
+  return cleaned;
+}
+
+function parseTideFile(content) {
+  var lines = content.split(/\r?\n/);
+  var meta = {};
+  var rows = [];
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    if (line.charAt(0) === '*' || line.indexOf('결측') >= 0 || line.indexOf('보간') >= 0) continue;
+    var dm = line.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s+(-?\d+(?:\.\d+)?)/);
+    if (dm) {
+      var t = new Date(+dm[1], +dm[2]-1, +dm[3], +dm[4], +dm[5], +(dm[6]||0));
+      var v = parseFloat(dm[7]);
+      if (!isNaN(t.getTime()) && !isNaN(v)) rows.push({ t: t.getTime(), v: v });
+      continue;
+    }
+    var mm = line.match(/^([^:]+?)\s*:\s*(.*)$/);
+    if (mm) meta[mm[1].trim()] = mm[2].trim();
+  }
+  rows.sort(function(a, b) { return a.t - b.t; });
+  return { meta: meta, rows: rows };
+}
+
+function aggregateDaily(rows, extrema) {
+  var byDay = {};
+  for (var i = 0; i < rows.length; i++) {
+    var d = new Date(rows[i].t);
+    var key = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+    if (!byDay[key]) byDay[key] = { date: key, points: [], extrema: [] };
+    byDay[key].points.push(rows[i]);
+  }
+  // 극값을 날짜별로 배분
+  for (var i = 0; i < extrema.length; i++) {
+    var d = new Date(extrema[i].t);
+    var key = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+    if (byDay[key]) byDay[key].extrema.push(extrema[i]);
+  }
+  return Object.keys(byDay).sort().map(function(k) {
+    var pts = byDay[k].points;
+    var vals = pts.map(function(p){ return p.v; });
+    var min = Math.min.apply(null, vals);
+    var max = Math.max.apply(null, vals);
+    var sum = 0; for (var i = 0; i < vals.length; i++) sum += vals[i];
+    return {
+      date: k, min: min, max: max, range: max - min, mean: sum / vals.length,
+      extrema: byDay[k].extrema
+    };
+  });
+}
+
+function computeStats(rows) {
+  var vals = rows.map(function(r) { return r.v; });
+  var min = Math.min.apply(null, vals);
+  var max = Math.max.apply(null, vals);
+  var sum = 0; for (var i = 0; i < vals.length; i++) sum += vals[i];
+  return { count: vals.length, min: min, max: max, mean: sum / vals.length };
+}
+
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+// ============== 렌더링 ==============
+var mainChart = null;
+var dayChart = null;
+
+function render(data) {
+  var results = $('#results');
+  results.innerHTML = '';
+
+  var meta = data.meta || {};
+  var stationName = meta['대상조위관측소'] || meta['관측소명'] || data.fileName || '–';
+  var startStr = fmtDate(new Date(data.rows[0].t), {ymd:true});
+  var endStr = fmtDate(new Date(data.rows[data.rows.length-1].t), {ymd:true});
+
+  // ===== 관측소 정보 (알약 배지) =====
+  results.innerHTML += '<div class="info-pills">' +
+    '<span class="info-pill">📍 관측소: <b>' + stationName + '</b></span>' +
+    '<span class="info-pill">📅 관측 기간: <b>' + startStr + ' ~ ' + endStr + '</b></span>' +
+    '</div>';
+
+  // ===== 메인 시계열 =====
+  var sStr = fmtDate(new Date(data.rows[0].t), {dateOnly:true});
+  var eStr = fmtDate(new Date(data.rows[data.rows.length-1].t), {dateOnly:true});
+  results.innerHTML += '<div class="section-title"><h2>🌊 한 달간의 조위 변화</h2><span class="stnote">' + sStr + ' – ' + eStr + '</span></div>' +
+    '<div class="chart-card">' +
+      '<div class="chart-wrap"><canvas id="mainChart"></canvas></div>' +
+    '</div>';
+
+  setTimeout(function() { drawMainChart(data); }, 50);
+
+  // ===== 날짜별 상세보기 =====
+  var dayOptions = data.days.map(function(d, i) {
+    var dt = new Date(d.date + 'T00:00:00');
+    return '<option value="' + i + '">' + (dt.getMonth()+1) + '월 ' + dt.getDate() + '일 (음력 ' + lunarDay(dt) + '일)</option>';
+  }).join('');
+
+  results.innerHTML += '<div class="section-title"><h2>📅 날짜별 상세</h2></div>' +
+    '<div class="chart-card">' +
+      '<div class="day-detail-controls">' +
+        '<button class="day-nav-btn" id="dayPrev">‹</button>' +
+        '<select class="day-select" id="daySelect">' + dayOptions + '</select>' +
+        '<button class="day-nav-btn" id="dayNext">›</button>' +
+        '<label>날짜를 선택하면 그날의 조위 변화를 자세히 볼 수 있습니다</label>' +
+      '</div>' +
+      '<div id="tideSummary"></div>' +
+      '<div class="day-chart-wrap"><canvas id="dayChart"></canvas></div>' +
+    '</div>';
+
+  var daySelect = document.getElementById('daySelect');
+  daySelect.addEventListener('change', function() { showDayDetail(data, +this.value); });
+  document.getElementById('dayPrev').addEventListener('click', function() {
+    var i = +daySelect.value;
+    if (i > 0) { daySelect.value = i-1; showDayDetail(data, i-1); }
+  });
+  document.getElementById('dayNext').addEventListener('click', function() {
+    var i = +daySelect.value;
+    if (i < data.days.length-1) { daySelect.value = i+1; showDayDetail(data, i+1); }
+  });
+
+  // 기본: 첫째 날
+  daySelect.value = 0;
+  setTimeout(function() { showDayDetail(data, 0); }, 80);
+
+  setTimeout(function() { results.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 120);
+}
+
+// ============== 메인 차트 ==============
+function drawMainChart(data) {
+  var canvas = document.getElementById('mainChart');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  if (mainChart) mainChart.destroy();
+
+  var labels = data.rows.map(function(r) { return new Date(r.t); });
+  var s = data.stats;
+
+  var datasets = [{
+    label: '조위 (cm)',
+    data: data.rows.map(function(r) { return r.v; }),
+    borderColor: '#1e3a8a',
+    backgroundColor: 'rgba(30,58,138,0.06)',
+    borderWidth: 1.8, pointRadius: 0, pointHoverRadius: 4, tension: 0.2, fill: true
+  }];
+
+  mainChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', align: 'end', labels: { color: '#64748b', font: { size: 12 }, boxWidth: 24, boxHeight: 2 } },
+        tooltip: {
+          backgroundColor: '#0f172a', titleFont: { size: 12 }, bodyFont: { size: 13 }, padding: 10,
+          borderColor: '#1e3a8a', borderWidth: 1,
+          callbacks: { title: function(items) {
+            var d = new Date(items[0].parsed.x);
+            return fmtDate(d) + '  ·  음력 ' + lunarDay(d) + '일';
+          } }
+        }
+      },
+      scales: {
+        x: { type: 'time', time: { unit: 'day', displayFormats: { day: 'MM/dd' } },
+             grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#64748b', font: { size: 11 } } },
+        y: { title: { display: true, text: '조위 (cm)', color: '#1e3a8a', font: { size: 11, weight: '600' } },
+             grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#64748b', font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// ============== 날짜별 상세 ==============
+function showDayDetail(data, dayIdx) {
+  var day = data.days[dayIdx];
+  if (!day) return;
+  var dt = new Date(day.date + 'T00:00:00');
+  var ext = day.extrema || [];
+
+  // 요약 줄: 날짜 + 음력 + 달 위상 + 만조/간조 횟수 + 그날 최대 조차
+  var nHigh = ext.filter(function(e){ return e.type === 'high'; }).length;
+  var nLow = ext.filter(function(e){ return e.type === 'low'; }).length;
+  // 인접 만조-간조 쌍 중 가장 큰 조차
+  var maxRange = 0;
+  for (var i = 0; i < ext.length - 1; i++) {
+    var diff = Math.abs(ext[i+1].v - ext[i].v);
+    if (diff > maxRange) maxRange = diff;
+  }
+  var summaryLine = '<div class="day-summary-line">' +
+    '<b>' + (dt.getMonth()+1) + '월 ' + dt.getDate() + '일</b> · 음력 ' + lunarDay(dt) + '일' +
+    ' · 만조 ' + nHigh + '회, 간조 ' + nLow + '회' +
+    ' · 최대 조차 <b>' + fmt(maxRange,0) + ' cm</b>' +
+    '</div>';
+
+  document.getElementById('tideSummary').innerHTML = summaryLine;
+
+  // 그날 조위 곡선
+  var t0 = dt.getTime();
+  var t1 = t0 + 24*3600*1000;
+  var points = data.rows.filter(function(p) { return p.t >= t0 && p.t < t1; });
+
+  var canvas = document.getElementById('dayChart');
+  var ctx = canvas.getContext('2d');
+  if (dayChart) dayChart.destroy();
+
+  // 만조/간조 시각 집합
+  var highTimes = {}, lowTimes = {};
+  ext.forEach(function(e) {
+    if (e.type === 'high') highTimes[e.t] = true;
+    else lowTimes[e.t] = true;
+  });
+
+  var pointColors = points.map(function(p) {
+    if (highTimes[p.t]) return '#1e40af';
+    if (lowTimes[p.t]) return '#dc2626';
+    return 'rgba(30,58,138,0.4)';
+  });
+  var pointSizes = points.map(function(p) {
+    if (highTimes[p.t] || lowTimes[p.t]) return 6;
+    return 2;
+  });
+
+  // 극값 위에 만조/간조 라벨 표시 플러그인
+  var extremaLabelPlugin = {
+    id: 'extremaLabels',
+    afterDatasetsDraw: function(chart) {
+      var c = chart.ctx;
+      var meta = chart.getDatasetMeta(0);
+      points.forEach(function(p, idx) {
+        var isHigh = highTimes[p.t];
+        var isLow = lowTimes[p.t];
+        if (!isHigh && !isLow) return;
+        var pt = meta.data[idx];
+        if (!pt) return;
+        c.save();
+        c.font = '600 11px Pretendard, sans-serif';
+        c.textAlign = 'center';
+        c.fillStyle = isHigh ? '#1e40af' : '#dc2626';
+        var label = (isHigh ? '만조(' : '간조(') + fmt(p.v,0) + 'cm)';
+        var yOff = isHigh ? -12 : 18;
+        c.fillText(label, pt.x, pt.y + yOff);
+        c.restore();
+      });
+    }
+  };
+
+  dayChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: points.map(function(p) { return new Date(p.t); }),
+      datasets: [{
+        label: '조위 (cm)',
+        data: points.map(function(p) { return p.v; }),
+        borderColor: '#1e3a8a',
+        backgroundColor: 'rgba(30,58,138,0.1)',
+        borderWidth: 2,
+        pointRadius: pointSizes,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors,
+        pointHoverRadius: 6,
+        tension: 0.35, fill: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      layout: { padding: { top: 20, bottom: 8 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f172a', titleFont: { size: 12 }, bodyFont: { size: 13 }, padding: 10,
+          callbacks: {
+            title: function(items) { return fmtDate(new Date(items[0].parsed.x), {short:true}); },
+            label: function(item) { return '조위: ' + fmt(item.parsed.y,0) + ' cm'; }
+          }
+        }
+      },
+      scales: {
+        x: { type: 'time', time: { unit: 'hour', displayFormats: { hour: 'HH시' }, stepSize: 3 },
+             grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#64748b', font: { size: 11 } } },
+        y: { title: { display: true, text: '조위 (cm)', color: '#1e3a8a', font: { size: 11, weight: '600' } },
+             grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#64748b', font: { size: 11 } } }
+      }
+    },
+    plugins: [extremaLabelPlugin]
+  });
+}
+</script>
+</body>
+</html>
