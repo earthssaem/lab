@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>판구조론 3D 시뮬레이션</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap');
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+  :root{--bg:#eef3fa;--card:#fff;--ink:#1f2d3d;--sub:#5a6b7d;--line:#dce5f0;--blue:#2563eb;--blue-soft:#e9f1ff;}
+  body{background:var(--bg);color:var(--ink);font-family:'Noto Sans KR',sans-serif;min-height:100vh;
+    display:flex;flex-direction:column;align-items:center;overflow-x:hidden;}
+  header{width:100%;max-width:1020px;padding:22px 20px 0;text-align:center;}
+  header h1{font-size:clamp(18px,3vw,26px);font-weight:800;color:#15233a;}
+  header p{font-size:13px;color:var(--sub);margin-top:4px;}
+  .wrap{width:100%;max-width:1020px;padding:16px;display:flex;flex-direction:column;gap:12px;}
+  .row{display:flex;flex-wrap:wrap;gap:8px;}
+  .bbtn{flex:1 1 150px;padding:11px 13px;border:1.5px solid var(--line);border-radius:11px;background:var(--card);
+    color:var(--sub);cursor:pointer;font-family:inherit;font-weight:600;transition:all .18s;
+    display:flex;flex-direction:column;align-items:flex-start;gap:2px;}
+  .bbtn .n{font-size:14px;font-weight:800;color:#2c3e54;}
+  .bbtn .s">font-size:11px;color:var(--sub);}
+  .bbtn:hover{border-color:#b9cde8;background:#fafcff;}
+  .bbtn.on{border-color:var(--blue);background:var(--blue-soft);}
+  .bbtn.on .n{color:var(--blue);}
+  .pickrow{display:flex;gap:10px;flex-wrap:wrap;}
+  .picker{flex:1 1 200px;background:var(--card);border:1.5px solid var(--line);border-radius:11px;padding:10px 12px;}
+  .picker .t{font-size:11px;color:var(--sub);margin-bottom:7px;font-weight:700;}
+  .opts{display:flex;gap:6px;}
+  .obtn{flex:1;padding:9px 6px;border:1.5px solid var(--line);border-radius:8px;background:var(--card);
+    color:var(--sub);cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;transition:all .16s;
+    display:flex;flex-direction:column;align-items:center;gap:4px;}
+  .obtn .d{width:24px;height:9px;border-radius:3px;}
+  .obtn.ocean.on{border-color:#3b82f6;background:#e8f1ff;color:#1d4ed8;}
+  .obtn.cont.on{border-color:#65a30d;background:#f0f9e8;color:#3f6212;}
+  .obtn:not(.on):hover{background:#fafcff;}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .seg{display:flex;gap:5px;background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:4px;}
+  .sbtn{padding:8px 13px;border:none;border-radius:7px;background:transparent;color:var(--sub);cursor:pointer;
+    font-family:inherit;font-size:13px;font-weight:700;transition:all .16s;}
+  .sbtn.on{background:var(--blue);color:#fff;}
+  .sbtn:not(.on):hover{color:var(--ink);background:#f0f5fb;}
+  .pbtn{width:40px;height:38px;border:1.5px solid var(--line);border-radius:9px;background:var(--card);cursor:pointer;
+    font-size:15px;display:flex;align-items:center;justify-content:center;color:var(--ink);transition:all .16s;}
+  .pbtn:hover{border-color:#b9cde8;background:#fafcff;}
+  .stage{position:relative;width:100%;height:520px;border-radius:14px;overflow:hidden;border:1.5px solid var(--line);
+    box-shadow:0 6px 24px rgba(40,80,150,0.08);background:linear-gradient(#cfe4f5,#eef3fa);}
+  #cv{width:100%;height:100%;display:block;cursor:grab;}
+  #cv:active{cursor:grabbing;}
+  .lbl{position:absolute;transform:translate(-50%,-50%);pointer-events:none;font-size:12px;font-weight:800;
+    padding:2px 8px;border-radius:11px;white-space:nowrap;background:rgba(255,255,255,0.86);border:1px solid rgba(0,0,0,0.08);}
+  .lbl.red{color:#b91c1c;} .lbl.blue{color:#1d4ed8;} .lbl.green{color:#3f6212;} .lbl.orange{color:#c2410c;} .lbl.ink{color:#243a52;}
+  .hint{font-size:12px;color:var(--sub);text-align:center;}
+  .divNote{font-size:12px;color:#1d4ed8;background:#eff6ff;border:1px solid #c3d9fb;border-radius:8px;padding:7px 12px;display:none;}
+  footer{font-size:11px;color:#90a4bb;text-align:center;padding:4px 16px 24px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>판구조론 3D 시뮬레이션</h1>
+  <p>통합과학1 · 판의 경계와 지각 변동</p>
+</header>
+<div class="wrap">
+  <div class="row">
+    <button class="bbtn on" data-mode="divergent" onclick="setMode('divergent')"><span class="n">⬅ ➡ 발산형</span><span class="s">두 판이 멀어짐</span></button>
+    <button class="bbtn" data-mode="convergent" onclick="setMode('convergent')"><span class="n">➡ ⬅ 수렴형</span><span class="s">두 판이 가까워짐</span></button>
+    <button class="bbtn" data-mode="transform" onclick="setMode('transform')"><span class="n">↗↙ 보존형</span><span class="s">두 판이 어긋남</span></button>
+  </div>
+  <div class="pickrow">
+    <div class="picker"><div class="t">◀ 왼쪽 판</div><div class="opts">
+      <button class="obtn ocean on" data-side="left" data-type="ocean" onclick="setPlate('left','ocean')"><span class="d" style="background:#3b82f6"></span>해양판</button>
+      <button class="obtn cont" data-side="left" data-type="cont" onclick="setPlate('left','cont')"><span class="d" style="background:#65a30d"></span>대륙판</button>
+    </div></div>
+    <div class="picker"><div class="t">오른쪽 판 ▶</div><div class="opts">
+      <button class="obtn ocean on" data-side="right" data-type="ocean" onclick="setPlate('right','ocean')"><span class="d" style="background:#3b82f6"></span>해양판</button>
+      <button class="obtn cont" data-side="right" data-type="cont" onclick="setPlate('right','cont')"><span class="d" style="background:#65a30d"></span>대륙판</button>
+    </div></div>
+  </div>
+  <div class="divNote" id="divNote">ℹ️ 발산형 경계에서는 같은 종류의 판끼리 갈라집니다. 한쪽을 바꾸면 반대쪽도 같은 종류가 됩니다.</div>
+  <div class="toolbar">
+    <div class="seg">
+      <button class="sbtn" data-view="top" onclick="setView('top')">🗺 위에서 보기</button>
+      <button class="sbtn on" data-view="side" onclick="setView('side')">⛰ 옆에서 보기</button>
+      <button class="sbtn" data-view="iso" onclick="setView('iso')">🧊 입체로 보기</button>
+    </div>
+    <button class="pbtn" id="playBtn" onclick="togglePlay()" title="재생/일시정지">⏸</button>
+    <button class="pbtn" onclick="resetSim()" title="처음으로">↺</button>
+  </div>
+  <div class="stage">
+    <canvas id="cv"></canvas>
+    <div id="labels"></div>
+  </div>
+  <div class="hint">🖱 드래그로 회전 · 휠로 확대 · 또는 위 시점 버튼 사용</div>
+</div>
+<footer>교육용 3D 시뮬레이션 · Three.js</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const cv=document.getElementById('cv'), labelLayer=document.getElementById('labels');
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(42,16/9,0.1,1000);
+scene.add(new THREE.AmbientLight(0xffffff,0.74));
+const dl=new THREE.DirectionalLight(0xffffff,0.7);dl.position.set(8,14,10);scene.add(dl);
+const dl2=new THREE.DirectionalLight(0xbcd4ff,0.3);dl2.position.set(-8,5,-8);scene.add(dl2);
+
+const COL={
+  oceanTop:0x4a90d9, oceanRock:0x244a78,
+  contTop:0x74c247, contRock:0xb08a52,
+  mantle:0xef8a3a, mantleDeep:0xcf5a1a,
+  magma:0xff5320, magmaHot:0xffc04d,
+  water:0x9cd0ee, mountain:0x9c7d52, snow:0xf3f7ff, trench:0x14304f,
+};
+
+const OCEAN_TH=0.6, CONT_TH=2.6;
+const OCEAN_ROCK=1.6, CONT_ROCK=2.2;
+function topH(t){return t==='cont'?CONT_TH:OCEAN_TH;}
+function rockH(t){return t==='cont'?CONT_ROCK:OCEAN_ROCK;}
+
+let world=new THREE.Group();scene.add(world);
+let mode='divergent',leftType='ocean',rightType='ocean';
+let creep=0, mantleTime=0, playing=true; // mantleTime 분리
+let parts=[];
+let labels=[];
+
+// ── builders ──
+function plateBlock(w,d,type){
+  const g=new THREE.Group();
+  const tH=topH(type), rH=rockH(type);
+  const top=new THREE.Mesh(new THREE.BoxGeometry(w,tH,d),
+    new THREE.MeshLambertMaterial({color:type==='cont'?COL.contTop:COL.oceanTop}));
+  top.position.y=-tH/2; g.add(top);
+  const rock=new THREE.Mesh(new THREE.BoxGeometry(w,rH,d),
+    new THREE.MeshLambertMaterial({color:type==='cont'?COL.contRock:COL.oceanRock}));
+  rock.position.y=-tH-rH/2; g.add(rock);
+  g.userData={w,d,type,tH,rH};
+  return g;
+}
+function mantleBase(){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(40,5,18),
+    new THREE.MeshLambertMaterial({color:COL.mantle}));
+  m.position.y=-7; return m;
+}
+function mantlePlume(){
+  const g=new THREE.Group();
+  for(let i=0; i<5; i++){
+    const r=1.5-i*0.12;
+    const s=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),
+      new THREE.MeshLambertMaterial({color: i<2?COL.magmaHot:COL.mantleDeep, emissive:0x5a1800}));
+    s.position.y=-i*1.0; g.add(s);
+  }
+  g.position.set(0,-4.5,0);
+  return g;
+}
+function waterPatch(w,d,x,z=0){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,0.18,d),
+    new THREE.MeshLambertMaterial({color:COL.water,transparent:true,opacity:0.5}));
+  m.position.set(x,0.45,z); return m;
+}
+function magmaColumn(x,topY,botY,r=0.7){
+  const h=botY-topY;
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r*1.8,h,16),
+    new THREE.MeshLambertMaterial({color:COL.magma,emissive:0x6a1800}));
+  m.position.set(x,(topY+botY)/2,0); return m;
+}
+function mountainRange(x,scale){
+  const g=new THREE.Group();
+  for(let i=0;i<6;i++){
+    const hh=(1.6+Math.random()*1.8)*scale;
+    const c=new THREE.Mesh(new THREE.ConeGeometry(0.85*scale,hh,5),
+      new THREE.MeshLambertMaterial({color:COL.mountain}));
+    c.position.set(x+(i-2.5)*0.8*scale,hh/2,(Math.random()-0.5)*4);g.add(c);
+    if(hh>2.4){const s=new THREE.Mesh(new THREE.ConeGeometry(0.36*scale,hh*0.28,5),
+      new THREE.MeshLambertMaterial({color:COL.snow}));s.position.set(c.position.x,hh*0.84,c.position.z);g.add(s);}
+  }
+  return g;
+}
+function volcano(x,z,baseY){
+  const g=new THREE.Group();
+  const cone=new THREE.Mesh(new THREE.ConeGeometry(1.0,1.8,12),new THREE.MeshLambertMaterial({color:0x6b4a2a}));
+  cone.position.set(x,baseY+0.9,z);g.add(cone);
+  const lava=new THREE.Mesh(new THREE.ConeGeometry(0.34,0.5,10),new THREE.MeshLambertMaterial({color:COL.magma,emissive:0x6a1800}));
+  lava.position.set(x,baseY+1.85,z);g.add(lava);
+  return g;
+}
+function flowArrow(x,y,z,dir,len=2.2,col=0xffffff){
+  const g=new THREE.Group();
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,len,10),
+    new THREE.MeshLambertMaterial({color:col}));
+  g.add(shaft);
+  const head=new THREE.Mesh(new THREE.ConeGeometry(0.42,0.7,12),
+    new THREE.MeshLambertMaterial({color:col}));
+  head.position.y=dir*(len/2+0.3);
+  if(dir<0) head.rotation.x=Math.PI;
+  g.add(head);
+  g.position.set(x,y,z);
+  return g;
+}
+
+function clearWorld(){
+  while(world.children.length)world.remove(world.children[0]);
+  parts=[]; labels.forEach(l=>l.el.remove()); labels=[];
+}
+function addLabel(text,cls,x,y,z){
+  const el=document.createElement('div');el.className='lbl '+cls;el.textContent=text;
+  labelLayer.appendChild(el); labels.push({el,pos:new THREE.Vector3(x,y,z)});
+}
+
+// ── DIVERGENT ──
+function buildDivergent(){
+  const isOcean=leftType==='ocean';
+  const d=14, bw=15;
+  world.add(mantleBase());
+  const lB=plateBlock(bw,d,leftType); lB.position.x=-bw/2-0.2;
+  const rB=plateBlock(bw,d,rightType); rB.position.x= bw/2+0.2;
+  world.add(lB);world.add(rB);
+  parts.push({mesh:lB,role:'plate',base:-bw/2-0.2,dir:-1});
+  parts.push({mesh:rB,role:'plate',base: bw/2+0.2,dir:+1});
+  
+  const col=magmaColumn(0,-0.5,-5,0.8); world.add(col);
+  parts.push({mesh:col,role:'risingMagma'});
+  
+  const newCrust=new THREE.Mesh(new THREE.BoxGeometry(2,OCEAN_TH,d),
+    new THREE.MeshLambertMaterial({color:COL.oceanTop}));
+  newCrust.position.set(0,-OCEAN_TH/2,0); world.add(newCrust);
+  parts.push({mesh:newCrust,role:'newCrust'});
+  
+  if(isOcean){ world.add(waterPatch(34,d,0)); addLabel('해령 (새 지각 생성)','red',0,1.4,7); }
+  else {
+    const floor=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.1,d),new THREE.MeshLambertMaterial({color:0x7a5e38}));
+    floor.position.set(0,-0.7,0); world.add(floor);
+    addLabel('열곡대','red',0,1.4,7);
+  }
+  
+  const plume=mantlePlume(); world.add(plume);
+  parts.push({mesh:plume,role:'mantleUp',baseY:-4.5});
+  
+  // 클로드가 누락한 맨틀 대류 상승 화살표 배치
+  const arrL = flowArrow(-1.8, -5.2, 2, 1, 1.8, 0xff7340);
+  const arrR = flowArrow(1.8, -5.2, -2, 1, 1.8, 0xff7340);
+  world.add(arrL); world.add(arrR);
+  parts.push({mesh:arrL, role:'arrowUp', baseY:-5.2});
+  parts.push({mesh:arrR, role:'arrowUp', baseY:-5.2});
+
+  addLabel('맨틀 상승(대류)','orange',3.5,-3.5,0);
+  addLabel(isOcean?'해양판':'대륙판','ink',-bw/2-1,1.0,7);
+  addLabel(isOcean?'해양판':'대륙판','ink', bw/2+1,1.0,7);
+  parts.push({role:'lblPlateL',idx:labels.length-2,base:-bw/2-1,dir:-1});
+  parts.push({role:'lblPlateR',idx:labels.length-1,base: bw/2+1,dir:+1});
+}
+
+// ── CONVERGENT ──
+function buildConvergent(){
+  const o=(leftType==='ocean')+(rightType==='ocean');
+  const d=14;
+  world.add(mantleBase());
+  if(o===0){ // 충돌형
+    const bw=14;
+    const lB=plateBlock(bw,d,'cont'); lB.position.x=-bw/2-1.5;
+    const rB=plateBlock(bw,d,'cont'); rB.position.x= bw/2+1.5;
+    world.add(lB);world.add(rB);
+    parts.push({mesh:lB,role:'plate',base:-bw/2-1.5,dir:-1});
+    parts.push({mesh:rB,role:'plate',base: bw/2+1.5,dir:+1});
+    const mtn=mountainRange(0,1.3); world.add(mtn); parts.push({mesh:mtn,role:'growMountain'});
+    
+    const plume=mantlePlume(); world.add(plume);
+    parts.push({mesh:plume,role:'mantleDown',baseY:-4.5});
+    
+    // 맨틀 하강 화살표 배치
+    const arrL = flowArrow(-1.5, -4.8, 1, -1, 1.8, 0x40a0ff);
+    const arrR = flowArrow(1.5, -4.8, -1, -1, 1.8, 0x40a0ff);
+    world.add(arrL); world.add(arrR);
+    parts.push({mesh:arrL, role:'arrowDown', baseY:-4.8});
+    parts.push({mesh:arrR, role:'arrowDown', baseY:-4.8});
+
+    addLabel('맨틀 하강','orange',3.5,-5.5,0);
+    addLabel('습곡 산맥','ink',0,4.2,7);
+    addLabel('대륙판','ink',-7,1.4,7); addLabel('대륙판','ink',7,1.4,7);
+  } else { // 섭입형
+    const overType=(leftType==='ocean'&&rightType==='ocean')?'ocean':(leftType==='ocean'?rightType:leftType);
+    const trenchX=0;
+    const overB=plateBlock(16,d,overType); overB.position.x=trenchX+8;
+    world.add(overB);
+    parts.push({mesh:overB,role:'overPlate',base:trenchX+8});
+    
+    const flatB=plateBlock(16,d,'ocean'); flatB.position.x=trenchX-8;
+    world.add(flatB);
+    parts.push({mesh:flatB,role:'flatPlate',base:trenchX-8});
+    
+    const slabPivot=new THREE.Group(); slabPivot.position.set(trenchX,-OCEAN_TH/2,0);
+    const slabLen=11;
+    const slab=new THREE.Mesh(new THREE.BoxGeometry(slabLen,OCEAN_TH+0.3,d),
+      new THREE.MeshLambertMaterial({color:COL.oceanTop}));
+    slab.position.set(slabLen/2,0,0);
+    slabPivot.add(slab);
+    slabPivot.rotation.z = -0.95;
+    world.add(slabPivot);
+    parts.push({mesh:slabPivot,role:'slabConveyor'});
+    
+    world.add(waterPatch(18,d,trenchX-8));
+    if(overType==='ocean') world.add(waterPatch(14,d,trenchX+8));
+    
+    const trench=new THREE.Mesh(new THREE.BoxGeometry(0.7,1.6,d),new THREE.MeshLambertMaterial({color:COL.trench}));
+    trench.position.set(trenchX,-0.5,0); trench.rotation.z=0.4; world.add(trench);
+    
+    const vol=volcano(4.5,0,0); world.add(vol); parts.push({mesh:vol,role:'growVolcano'});
+    const col=magmaColumn(4.5,-0.5,-4,0.5); world.add(col); parts.push({mesh:col,role:'risingMagma'});
+    if(overType==='cont'){ const mtn=mountainRange(7,0.8); world.add(mtn); parts.push({mesh:mtn,role:'growMountain'}); }
+    
+    const plume=mantlePlume(); plume.position.x=2.5; world.add(plume);
+    parts.push({mesh:plume,role:'mantleDown',baseY:-4.5,baseX:2.5});
+    
+    // 섭입대 하강 화살표 배치
+    const arrS1 = flowArrow(1.2, -4.5, 2, -1, 1.8, 0x40a0ff);
+    arrS1.rotation.z = -0.5; 
+    world.add(arrS1);
+    parts.push({mesh:arrS1, role:'arrowDownAngle', baseY:-4.5, baseX:1.2});
+
+    addLabel('맨틀 하강','orange',5.2,-5.6,0);
+    addLabel('해구','blue',trenchX,1.6,7);
+    addLabel(overType==='cont'?'화산(호상열도)':'호상열도','red',4.5,2.6,7);
+    addLabel('해양판 (섭입)','ink',trenchX-8,1.2,7);
+    addLabel(overType==='cont'?'대륙판':'해양판','ink',trenchX+9,1.2,7);
+    addLabel('마그마 생성','orange',3.8,-2.4,0);
+  }
+}
+
+// ── TRANSFORM ──
+function buildTransform(){
+  const d=7, bw=16;
+  world.add(mantleBase());
+  const aB=plateBlock(bw,d,leftType);  aB.position.z=-d/2-0.5;
+  const bB=plateBlock(bw,d,rightType); bB.position.z= d/2+0.5;
+  world.add(aB);world.add(bB);
+  parts.push({mesh:aB,role:'shear',baseZ:-d/2-0.5,dir:-1});
+  parts.push({mesh:bB,role:'shear',baseZ: d/2+0.5,dir:+1});
+  if(leftType==='ocean'||rightType==='ocean') world.add(waterPatch(bw+4,d*2+3,0));
+  
+  const fault=new THREE.Mesh(new THREE.BoxGeometry(bw,0.12,0.35),new THREE.MeshBasicMaterial({color:0xe23b3b}));
+  fault.position.set(0,0.35,0); world.add(fault);
+  addLabel('변환 단층','red',0,1.4,0);
+  addLabel(leftType==='cont'?'대륙판':'해양판','ink',0,1.0,-d/2-3);
+  addLabel(rightType==='cont'?'대륙판':'해양판','ink',0,1.0,d/2+3);
+  addLabel('지진 발생 (화산 없음)','green',-bw/2+3,1.4,0);
+}
+
+function build(){
+  clearWorld();
+  if(mode==='divergent')buildDivergent();
+  else if(mode==='convergent')buildConvergent();
+  else buildTransform();
+}
+
+// ── UI ──
+function setMode(m){
+  mode=m; creep=0;
+  document.querySelectorAll('.bbtn').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
+  document.getElementById('divNote').style.display=m==='divergent'?'block':'none';
+  if(m==='divergent')rightType=leftType;
+  syncPlateBtns(); build();
+}
+function setPlate(side,type){
+  if(side==='left')leftType=type;else rightType=type;
+  if(mode==='divergent'){ if(side==='left')rightType=leftType; else leftType=rightType; }
+  creep=0; syncPlateBtns(); build();
+}
+function syncPlateBtns(){
+  document.querySelectorAll('.obtn[data-side="left"]').forEach(b=>b.classList.toggle('on',b.dataset.type===leftType));
+  document.querySelectorAll('.obtn[data-side="right"]').forEach(b=>b.classList.toggle('on',b.dataset.type===rightType));
+}
+function togglePlay(){playing=!playing;document.getElementById('playBtn').textContent=playing?'⏸':'▶';}
+function resetSim(){creep=0;} // 수동 리셋 구조 활성화
+
+// ── camera ──
+let camAngle=Math.PI/2, camPitch=0.32, camDist=30;
+function setView(v){
+  document.querySelectorAll('.sbtn').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+  if(v==='top'){ camAngle=Math.PI/2; camPitch=1.45; }
+  else if(v==='side'){ camAngle=Math.PI/2; camPitch=0.12; }
+  else { camAngle=Math.PI/2.6; camPitch=0.6; }
+  updateCamera();
+}
+function updateCamera(){
+  const cx=Math.cos(camAngle)*Math.cos(camPitch)*camDist;
+  const cy=Math.sin(camPitch)*camDist;
+  const cz=Math.sin(camAngle)*Math.cos(camPitch)*camDist;
+  camera.position.set(cx,cy,cz);camera.lookAt(0,-1.5,0);
+}
+let dragging=false,lastX,lastY;
+cv.addEventListener('mousedown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;});
+window.addEventListener('mouseup',()=>dragging=false);
+window.addEventListener('mousemove',e=>{if(!dragging)return;
+  camAngle+=(e.clientX-lastX)*0.01;camPitch=Math.max(0.08,Math.min(1.5,camPitch+(e.clientY-lastY)*0.008));
+  lastX=e.clientX;lastY=e.clientY;updateCamera();});
+cv.addEventListener('wheel',e=>{e.preventDefault();camDist=Math.max(16,Math.min(50,camDist+e.deltaY*0.02));updateCamera();},{passive:false});
+
+// ── animate ──
+const MAXC=4.0; // 자연스러운 한계 도달 설정
+function tick(){
+  if(playing){ 
+    // 판의 운동과 지형 성장은 한계치까지만 가고 정지 (설명하기 좋게 멈춤 보존)
+    if(creep < MAXC) creep += 0.012; 
+    // 맨틀 대류와 마그마는 정지하지 않고 계속 흐름 (무한 순환)
+    mantleTime += 0.025; 
+  }
+  const c=creep;
+  const mt=mantleTime;
+  
+  parts.forEach(p=>{
+    if(p.role==='plate'){
+      const sign=(mode==='divergent')?+1:-1;
+      p.mesh.position.x=p.base+p.dir*c*sign;
+    } else if(p.role==='overPlate'){
+      p.mesh.position.x=Math.max(p.base-c*0.3, p.base-1.5);
+    } else if(p.role==='flatPlate'){
+      p.mesh.position.x=Math.min(p.base+c*0.7, p.base+3.2);
+    } else if(p.role==='slabConveyor'){
+      // 섭입 메커니즘을 동적으로 유지하기 위한 미세 움직임
+      p.mesh.rotation.z=-0.95 - Math.sin(mt*1.5)*0.015;
+    } else if(p.role==='mantleUp'){
+      const u=(mt*0.6)%2; p.mesh.position.y=p.baseY+u;
+      p.mesh.scale.y=1+Math.sin(mt*2)*0.08;
+    } else if(p.role==='mantleDown'){
+      const dn=(mt*0.6)%2; p.mesh.position.y=p.baseY-dn;
+      p.mesh.scale.y=1+Math.sin(mt*2)*0.08;
+    } else if(p.role==='shear'){
+      p.mesh.position.x=p.dir*c*1.2;
+    } else if(p.role==='risingMagma'){
+      const s=1+Math.sin(mt*3)*0.12; p.mesh.scale.y=s;
+    } else if(p.role==='newCrust'){
+      p.mesh.scale.x=Math.max(0.1,c*1.2); 
+    } else if(p.role==='growMountain'){
+      p.mesh.scale.y=0.2 + Math.min(c/MAXC,1)*1.1; // 서서히 솟아나 고정
+    } else if(p.role==='growVolcano'){
+      const grow=Math.max(0,(c-1.0))/3.0; const s=Math.max(0.05,Math.min(grow,1));
+      p.mesh.scale.set(s,s,s); p.mesh.visible=grow>0.02;
+    } else if(p.role==='arrowUp'){
+      // 화살표가 무한히 위로 상승하는 애니메이션
+      const u=(mt*0.8)%1.6; p.mesh.position.y=p.baseY+u;
+    } else if(p.role==='arrowDown'){
+      // 화살표가 무한히 아래로 하강하는 애니메이션
+      const dn=(mt*0.8)%1.6; p.mesh.position.y=p.baseY-dn;
+    } else if(p.role==='arrowDownAngle'){
+      // 섭입 방향 경사 하강 화살표 애니메이션
+      const step=(mt*0.8)%1.6;
+      p.mesh.position.y=p.baseY - step * Math.sin(0.95);
+      p.mesh.position.x=p.baseX + step * Math.cos(0.95);
+    } else if(p.role==='lblPlateL'||p.role==='lblPlateR'){
+      const sign=(mode==='divergent')?+1:-1;
+      labels[p.idx].pos.x=p.base+p.dir*c*sign;
+    }
+  });
+  
+  labels.forEach(l=>{
+    const v=l.pos.clone().project(camera);
+    const x=(v.x*0.5+0.5)*cv.clientWidth, y=(-v.y*0.5+0.5)*cv.clientHeight;
+    l.el.style.display=(v.z<1)?'block':'none';
+    l.el.style.left=x+'px'; l.el.style.top=y+'px';
+  });
+  renderer.render(scene,camera);
+  requestAnimationFrame(tick);
+}
+function resize(){const w=cv.clientWidth,h=cv.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+window.addEventListener('resize',resize);
+
+setMode('divergent'); setView('iso'); resize(); tick();
+</script>
+</body>
+</html>
