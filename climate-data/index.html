@@ -118,13 +118,27 @@
     .gas-select-row{display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap}
     .gas-select-row label{font-size:13px;color:#64748b;font-weight:500}
     .gas-select-row select{padding:7px 12px;font-size:13px;border:1px solid #cbd5e1;border-radius:8px;background:white}
+    @media (max-width: 640px){
+      body{padding:0.5rem}
+      .header h1{font-size:20px}
+      .header p{font-size:13px}
+      .main-tabs{flex-direction:column;gap:4px}
+      .main-tab{padding:10px;font-size:13px}
+      .stat-grid{grid-template-columns:repeat(2,1fr)}
+      .chart-tabs{gap:4px}
+      .tab-btn{padding:5px 10px;font-size:12px}
+      .input-row{flex-direction:column;align-items:flex-start}
+      .run-btn{width:100%}
+      .compare-summary{grid-template-columns:1fr}
+      .section-card,.chart-card{padding:1rem}
+    }
   </style>
 </head>
 <body>
 <div class="wrap">
   <div class="header">
     <h1>🌍 기후 변화 데이터 분석 및 시각화 도구</h1>
-    <p>기상청 CSV 데이터를 업로드하면 자동으로 분석합니다</p>
+    <p>기상자료개방포털에서 다운받은 CSV 데이터를 업로드하면 기온 변화와 온실기체 농도의 경향성을 시각화합니다</p>
   </div>
 
   <!-- 메인 탭 -->
@@ -142,8 +156,8 @@
       <p style="font-size:12px;margin-top:4px">기상청 연평균기온 데이터 (.csv)</p>
       <input type="file" id="tempCsvFile" accept=".csv" style="display:none">
     </div>
-    <button class="guide-toggle" onclick="toggleGuide('tempGuide',this)">📋 데이터 다운로드 방법 보기 ▼</button>
-    <div class="guide-box" id="tempGuide">
+    <button class="guide-toggle" onclick="toggleGuide('tempGuide',this)">📋 데이터 다운로드 방법 닫기 ▲</button>
+    <div class="guide-box open" id="tempGuide">
       <h4>🌡️ 연평균기온 데이터 다운로드</h4>
       <ol>
         <li><a href="https://data.kma.go.kr" target="_blank" style="color:#3b82f6">기상자료개방포털</a> 접속 및 회원가입/로그인</li>
@@ -240,8 +254,8 @@
       <p style="font-size:12px;margin-top:4px">기상청 온실기체 데이터 (.csv)</p>
       <input type="file" id="gasCsvFile" accept=".csv" style="display:none">
     </div>
-    <button class="guide-toggle" onclick="toggleGuide('gasGuide',this)">📋 데이터 다운로드 방법 보기 ▼</button>
-    <div class="guide-box" id="gasGuide">
+    <button class="guide-toggle" onclick="toggleGuide('gasGuide',this)">📋 데이터 다운로드 방법 닫기 ▲</button>
+    <div class="guide-box open" id="gasGuide">
       <h4>🏭 온실기체 관측 데이터 다운로드</h4>
       <ol>
         <li><a href="https://data.kma.go.kr" target="_blank" style="color:#3b82f6">기상자료개방포털</a> 접속</li>
@@ -433,6 +447,13 @@ function resetTempUI(){
 
 function processTempData(csv){
   resetTempUI();
+  // 가이드 자동 닫기
+  const tempGuide=document.getElementById('tempGuide');
+  const tempBtn=document.querySelector('[onclick="toggleGuide(\'tempGuide\',this)"]');
+  if(tempGuide.classList.contains('open')){
+    tempGuide.classList.remove('open');
+    if(tempBtn) tempBtn.textContent='📋 데이터 다운로드 방법 보기 ▼';
+  }
   const lines=csv.split('\n');
   const stations={};
   for(let i=0;i<lines.length;i++){
@@ -564,8 +585,16 @@ function predictTemp(){
   if(!tSlope){rb.className='result-box warn';rb.innerHTML='⚠️ 미션 1의 추세 분석을 먼저 실행해주세요!';return;}
   if(!ty){rb.className='result-box warn';rb.innerHTML='⚠️ 예측할 연도를 입력해주세요!';return;}
   rb.className='result-box green';
-  const pt=(tSlope*ty+tIntercept).toFixed(2);
-  rb.innerHTML='<b>'+ty+'년</b> 예상 평균 기온: <span class="highlight">'+pt+'℃</span><br><span style="font-size:12px;color:#94a3b8">선형 외삽 예측값 (위 분석 구간 변화율 적용)</span>';
+  const pt=parseFloat((tSlope*ty+tIntercept).toFixed(2));
+  // 최근 10년 평균 대비
+  const lastYear=tYears[tYears.length-1];
+  const decade10Start=lastYear-9;
+  const recentTemps=tTemps.filter((_,i)=>tYears[i]>=decade10Start);
+  const recentAvg=parseFloat((recentTemps.reduce((a,b)=>a+b,0)/recentTemps.length).toFixed(2));
+  const diff=parseFloat((pt-recentAvg).toFixed(2));
+  const diffStr=diff>0?'▲+'+diff+'℃':'▼'+diff+'℃';
+  const diffColor=diff>0?'#e74c3c':'#3b82f6';
+  rb.innerHTML='<b>'+ty+'년</b> 예상 평균 기온: <span class="highlight">'+pt+'℃</span> <span style="font-size:13px;color:#475569">('+decade10Start+'~'+lastYear+'년 평균 대비 <b style="color:'+diffColor+'">'+diffStr+'</b>)</span><br><span style="font-size:12px;color:#94a3b8">선형 외삽 예측값 (위 분석 구간 변화율 적용)</span>';
 }
 
 // ===========================
@@ -587,6 +616,13 @@ function resetGasUI(){
 
 function processGasData(csv){
   resetGasUI();
+  // 가이드 자동 닫기
+  const gasGuide=document.getElementById('gasGuide');
+  const gasBtn=document.querySelector('[onclick="toggleGuide(\'gasGuide\',this)"]');
+  if(gasGuide.classList.contains('open')){
+    gasGuide.classList.remove('open');
+    if(gasBtn) gasBtn.textContent='📋 데이터 다운로드 방법 보기 ▼';
+  }
   const lines=csv.split('\n');
   const stations={};
   for(let i=1;i<lines.length;i++){  // 1부터 시작 (헤더 스킵)
