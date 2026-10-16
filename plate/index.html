@@ -13,6 +13,10 @@
   header{width:100%;max-width:1020px;padding:22px 20px 0;text-align:center;}
   header h1{font-size:clamp(18px,3vw,26px);font-weight:800;color:#15233a;}
   header p{font-size:13px;color:var(--sub);margin-top:4px;}
+  /* 제목 부분(제목·부제)을 누르면 처음 화면으로 */
+  a.brand{display:inline-block;color:inherit;text-decoration:none;border-radius:16px;margin:-4px -8px;padding:4px 8px;-webkit-tap-highlight-color:transparent}
+  @media (hover:hover){ a.brand:hover h1{color:var(--blue)} }   /* 터치 화면에서는 누른 뒤 색이 남지 않게 */
+  a.brand:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
   .wrap{width:100%;max-width:1020px;padding:16px;display:flex;flex-direction:column;gap:12px;}
   .row{display:flex;flex-wrap:wrap;gap:8px;}
   .bbtn{flex:1 1 150px;padding:11px 13px;border:1.5px solid var(--line);border-radius:11px;background:var(--card);
@@ -59,8 +63,10 @@
 </head>
 <body>
 <header>
-  <h1>판구조론 3D 시뮬레이션</h1>
-  <p>통합과학1 · 판의 경계와 지각 변동</p>
+  <a class="brand" id="homeLink" href="#" title="처음 화면으로" aria-label="판구조론 3D 시뮬레이션 — 처음 화면으로">
+    <h1>판구조론 3D 시뮬레이션</h1>
+    <p>통합과학1 · 판의 경계와 지각 변동</p>
+  </a>
 </header>
 <div class="wrap">
   <div class="row">
@@ -373,6 +379,15 @@ function syncPlateBtns(){
 }
 function togglePlay(){playing=!playing;document.getElementById('playBtn').textContent=playing?'⏸':'▶';}
 function resetSim(){creep=0;} // 수동 리셋 구조 활성화
+// 제목을 누르면 처음 화면으로: 발산형 · 해양판/해양판 · 입체로 보기 · 재생
+function goHome(){
+  if(mode!=='divergent')setMode('divergent');
+  if(leftType!=='ocean')setPlate('left','ocean');   // 발산형에서는 오른쪽 판도 같이 바뀜
+  camDist=30; setView('iso');
+  if(!playing)togglePlay();
+  scrollTo(0,0); document.body.scrollTop=0;   // 좁은 화면에서 스크롤한 경우 맨 위로
+}
+document.getElementById('homeLink').addEventListener('click',e=>{e.preventDefault();goHome();});
 
 // ── camera ──
 let camAngle=Math.PI/2, camPitch=0.32, camDist=30;
